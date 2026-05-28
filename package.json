@@ -1,0 +1,14 @@
+{
+  "name": "branching-video",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lightweight branching video player on top of YouTube embeds.",
+  "scripts": {
+    "dev": "serve . --listen tcp://0.0.0.0:8080 --no-clipboard",
+    "validate": "node tools/validate-config.js config.json"
+  },
+  "devDependencies": {
+    "serve": "^14.2.4"
+  },
+  "packageManager": "pnpm@10.19.0"
+}

@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loading…</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #111;
+      --border: #222;
+      --text: #f0f0f0;
+      --muted: #888;
+      --accent: #e8e8e8;
+      --aside-indicator: #f59e0b;
+      --btn-primary-bg: rgba(240,240,240,0.92);
+      --btn-primary-fg: #0a0a0a;
+      --btn-secondary-bg: rgba(20,20,20,0.85);
+      --btn-secondary-fg: #f0f0f0;
+      --btn-secondary-border: rgba(240,240,240,0.35);
+      --btn-skip-bg: rgba(245,158,11,0.15);
+      --btn-skip-border: rgba(245,158,11,0.5);
+      --btn-skip-fg: #f59e0b;
+      --btn-back-bg: rgba(240,240,240,0.15);
+      --btn-back-border: rgba(240,240,240,0.4);
+      --btn-back-fg: #f0f0f0;
+      --radius: 6px;
+      --transition: 220ms ease;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+    }
+
+    /* ── Layout ── */
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    #header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      min-height: 44px;
+      flex-shrink: 0;
+    }
+
+    #menu-toggle {
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 20px;
+      cursor: pointer;
+      padding: 4px 10px;
+      margin-left: -8px;
+      border-radius: var(--radius);
+      transition: background var(--transition);
+      line-height: 1;
+    }
+
+    #menu-toggle:hover { background: rgba(255,255,255,0.08); }
+
+    /* ── Chapter menu ── */
+    #menu {
+      position: fixed;
+      inset: 0;
+      background: rgba(10,10,10,0.96);
+      backdrop-filter: blur(8px);
+      z-index: 40;
+      display: none;
+      flex-direction: column;
+    }
+    #menu.visible { display: flex; }
+
+    #menu-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    #menu-title {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    #menu-close {
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 26px;
+      cursor: pointer;
+      padding: 0 8px;
+      line-height: 1;
+    }
+    #menu-close:hover { color: var(--muted); }
+
+    #menu-list {
+      flex: 1;
+      overflow-y: auto;
+      list-style: none;
+    }
+    .menu-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 14px 16px;
+      border: none;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      background: none;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 15px;
+      text-align: left;
+      cursor: pointer;
+      transition: background var(--transition);
+    }
+    .menu-item:hover { background: rgba(255,255,255,0.06); }
+    .menu-item.current {
+      background: rgba(245,158,11,0.08);
+      border-left: 3px solid var(--aside-indicator);
+      padding-left: 13px;
+    }
+    .menu-item-title { flex: 1; }
+    .menu-item-badge {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 3px 7px;
+      border-radius: 4px;
+      background: rgba(245,158,11,0.12);
+      border: 1px solid rgba(245,158,11,0.3);
+      color: var(--aside-indicator);
+    }
+
+    #show-title {
+      font-size: 13px;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+
+    #node-title {
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    #aside-badge {
+      display: none;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--aside-indicator);
+      background: rgba(245,158,11,0.12);
+      border: 1px solid rgba(245,158,11,0.3);
+      border-radius: 4px;
+      padding: 2px 7px;
+    }
+
+    #aside-badge.visible { display: inline-block; }
+
+    /* ── Player wrapper ── */
+    #player-wrap {
+      position: relative;
+      flex: 1;
+      background: #000;
+      overflow: hidden;
+    }
+
+    #yt-player {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* YouTube iframe needs explicit sizing */
+    #yt-player iframe {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── Overlay ── */
+    #overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 24px;
+      gap: 12px;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    /* Skip button (Pattern B — always visible during default aside) */
+    #skip-btn {
+      display: none;
+      pointer-events: all;
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: var(--btn-skip-bg);
+      border: 1px solid var(--btn-skip-border);
+      color: var(--btn-skip-fg);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 7px 14px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition);
+      letter-spacing: 0.02em;
+    }
+
+    #skip-btn:hover {
+      background: rgba(245,158,11,0.25);
+      border-color: rgba(245,158,11,0.7);
+    }
+
+    #skip-btn.visible { display: block; }
+
+    /* Back button — return to the moment of branching */
+    #back-btn {
+      display: none;
+      pointer-events: all;
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: var(--btn-back-bg);
+      border: 1px solid var(--btn-back-border);
+      color: var(--btn-back-fg);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 7px 14px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition);
+      letter-spacing: 0.02em;
+      backdrop-filter: blur(8px);
+    }
+
+    #back-btn:hover {
+      background: rgba(240,240,240,0.25);
+      border-color: rgba(240,240,240,0.6);
+    }
+
+    #back-btn.visible { display: block; }
+
+    /* Choice buttons container */
+    #choices {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      max-width: 520px;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 350ms ease, transform 350ms ease;
+    }
+
+    #choices.visible {
+      pointer-events: all;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Countdown bar */
+    #countdown-wrap {
+      width: 100%;
+      height: 3px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 4px;
+    }
+
+    #countdown-bar {
+      height: 100%;
+      width: 100%;
+      background: rgba(255,255,255,0.5);
+      transform-origin: left;
+      transition: transform linear;
+    }
+
+    .choice-btn {
+      width: 100%;
+      padding: 13px 20px;
+      border-radius: var(--radius);
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
+      text-align: center;
+      letter-spacing: 0.01em;
+      line-height: 1.3;
+    }
+
+    .choice-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+    .choice-btn:active { transform: translateY(0); }
+
+    .choice-btn.primary {
+      background: var(--btn-primary-bg);
+      color: var(--btn-primary-fg);
+    }
+
+    .choice-btn.secondary {
+      background: var(--btn-secondary-bg);
+      color: var(--btn-secondary-fg);
+      border-color: var(--btn-secondary-border);
+      backdrop-filter: blur(8px);
+    }
+
+    /* ── End screen ── */
+    #end-screen {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: var(--bg);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      padding: 32px;
+      text-align: center;
+      z-index: 20;
+    }
+
+    #end-screen.visible { display: flex; }
+
+    #end-heading {
+      font-size: clamp(22px, 4vw, 32px);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    #end-body {
+      font-size: 16px;
+      color: var(--muted);
+      max-width: 480px;
+      line-height: 1.6;
+    }
+
+    #end-links {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+      max-width: 360px;
+    }
+
+    .end-link-btn {
+      padding: 12px 20px;
+      border-radius: var(--radius);
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      display: block;
+      transition: transform var(--transition);
+    }
+
+    .end-link-btn:hover { transform: translateY(-1px); }
+    .end-link-btn:first-child { background: var(--btn-primary-bg); color: var(--btn-primary-fg); }
+    .end-link-btn:not(:first-child) {
+      background: var(--btn-secondary-bg);
+      color: var(--btn-secondary-fg);
+      border: 1px solid var(--btn-secondary-border);
+    }
+
+    /* ── Error / loading states ── */
+    #status {
+      display: none;
+      position: absolute;
+      inset: 0;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      font-size: 15px;
+      color: var(--muted);
+      z-index: 30;
+      text-align: center;
+      padding: 24px;
+    }
+
+    #status.visible { display: flex; }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <header id="header">
+    <button id="menu-toggle" aria-label="Open chapter menu" aria-expanded="false" aria-controls="menu">☰</button>
+    <span id="show-title">Loading…</span>
+    <span id="node-title"></span>
+    <span id="aside-badge">Deep dive</span>
+  </header>
+
+  <nav id="menu" aria-label="Chapters" aria-hidden="true">
+    <div id="menu-header">
+      <span id="menu-title">Chapters</span>
+      <button id="menu-close" aria-label="Close chapter menu">×</button>
+    </div>
+    <ul id="menu-list"></ul>
+  </nav>
+
+  <div id="player-wrap">
+    <div id="yt-player"></div>
+
+    <div id="overlay">
+      <button id="skip-btn" aria-label="Skip aside and return to main line"></button>
+      <button id="back-btn" aria-label="Return to where you branched from"></button>
+      <div id="choices" role="group" aria-label="Choose where to go next">
+        <div id="countdown-wrap" aria-hidden="true">
+          <div id="countdown-bar"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="end-screen" role="region" aria-label="End of video">
+      <div id="end-heading"></div>
+      <div id="end-body"></div>
+      <div id="end-links"></div>
+    </div>
+
+    <div id="status" role="status" aria-live="polite"></div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// Branching Video Player
+// Reads config.json, manages node routing,
+// embeds YouTube via IFrame API.
+// ─────────────────────────────────────────────
+
+const CONFIG_URL = 'config.json';
+const POLL_INTERVAL_MS = 250;
+const COUNTDOWN_TICK_MS = 50;
+const END_BACKSTOP_TOLERANCE = 0.25; // seconds past `end` before backstop fires
+
+let config = null;         // full parsed config.json
+let nodeMap = {};          // id → node object
+let ytPlayer = null;       // YouTube IFrame player instance
+let currentNode = null;    // currently playing node
+let choiceTimer = null;    // countdown interval (advances only while video is playing/ended)
+let pollHandle = null;     // setInterval for mid-segment time cues
+let segmentChoicesShown = false; // set true once choices are visible for the current segment
+let segmentReady = false;  // set true once the current segment has reached PLAYING — guards against
+                           // spurious ENDED events that YouTube fires during loadVideoById transitions
+let branchContext = null;  // { nodeId, currentTime } — captured when entering an aside that opts into
+                           // resume-at-branch-point via returnAtCurrentTime; consumed on return.
+
+// ── DOM refs ──────────────────────────────────
+const $showTitle   = document.getElementById('show-title');
+const $nodeTitle   = document.getElementById('node-title');
+const $asideBadge  = document.getElementById('aside-badge');
+const $skipBtn     = document.getElementById('skip-btn');
+const $backBtn     = document.getElementById('back-btn');
+const $choices     = document.getElementById('choices');
+const $cdBar       = document.getElementById('countdown-bar');
+const $cdWrap      = document.getElementById('countdown-wrap');
+const $endScreen   = document.getElementById('end-screen');
+const $endHeading  = document.getElementById('end-heading');
+const $endBody     = document.getElementById('end-body');
+const $endLinks    = document.getElementById('end-links');
+const $status      = document.getElementById('status');
+const $menu        = document.getElementById('menu');
+const $menuToggle  = document.getElementById('menu-toggle');
+const $menuClose   = document.getElementById('menu-close');
+const $menuList    = document.getElementById('menu-list');
+
+
+// ── Bootstrap ────────────────────────────────
+
+async function init() {
+  showStatus('Loading…');
+  try {
+    const res = await fetch(CONFIG_URL);
+    if (!res.ok) throw new Error(`Could not load ${CONFIG_URL} (${res.status})`);
+    config = await res.json();
+  } catch (e) {
+    showStatus(`⚠️ ${e.message}<br><small>Make sure config.json is in the same directory as player.html</small>`);
+    return;
+  }
+
+  // Build id → node lookup, strip comment fields
+  config.nodes.forEach(n => {
+    const node = {};
+    Object.keys(n).filter(k => !k.startsWith('_')).forEach(k => node[k] = n[k]);
+    node.choices = (node.choices || []).map(c => {
+      const choice = {};
+      Object.keys(c).filter(k => !k.startsWith('_')).forEach(k => choice[k] = c[k]);
+      return choice;
+    });
+    nodeMap[node.id] = node;
+  });
+
+  $showTitle.textContent = config.title || 'Interactive Video';
+  document.title = config.title || 'Interactive Video';
+
+  loadYouTubeAPI();
+}
+
+
+// ── YouTube IFrame API ────────────────────────
+
+function loadYouTubeAPI() {
+  if (window.YT && window.YT.Player) {
+    onYTReady();
+    return;
+  }
+  window.onYouTubeIframeAPIReady = onYTReady;
+  const s = document.createElement('script');
+  s.src = 'https://www.youtube.com/iframe_api';
+  document.head.appendChild(s);
+}
+
+function onYTReady() {
+  ytPlayer = new YT.Player('yt-player', {
+    width: '100%',
+    height: '100%',
+    playerVars: {
+      autoplay: 1,
+      controls: 1,
+      rel: 0,
+      modestbranding: 1,
+      iv_load_policy: 3,  // hide annotations
+      enablejsapi: 1,
+    },
+    events: {
+      onReady: onPlayerReady,
+      onStateChange: onPlayerStateChange,
+      onError: onPlayerError,
+    }
+  });
+}
+
+function onPlayerReady() {
+  hideStatus();
+  // Navigate to node from URL hash, or startNode
+  const hash = location.hash.replace('#', '').trim();
+  navigateTo(hash && nodeMap[hash] ? hash : config.startNode);
+}
+
+function onPlayerStateChange(e) {
+  // 0=ENDED, 1=PLAYING, 2=PAUSED, 3=BUFFERING, 5=CUED
+  if (e.data === 1) {
+    segmentReady = true;
+    startPolling();
+  } else if (e.data === 0) {
+    stopPolling();
+    // Guard 1: ignore ENDED before the new segment has actually started playing.
+    if (!segmentReady) return;
+    // Guard 2: when `end` is set, only treat ENDED as real if currentTime is near it.
+    // seekTo() from an ENDED state can re-fire ENDED before transitioning to PLAYING,
+    // which would otherwise trigger showChoices for the wrong moment.
+    if (currentNode && typeof currentNode.end === 'number'
+        && ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
+      const t = ytPlayer.getCurrentTime();
+      if (Math.abs(t - currentNode.end) > 5) return; // spurious — wait for the real end
+    }
+    onSegmentEnded();
+  }
+  // Other states (PAUSED, BUFFERING, CUED): leave polling alone; pollTick is a no-op when paused.
+}
+
+function startPolling() {
+  if (pollHandle != null) return;
+  pollHandle = setInterval(pollTick, POLL_INTERVAL_MS);
+}
+
+function stopPolling() {
+  if (pollHandle != null) clearInterval(pollHandle);
+  pollHandle = null;
+}
+
+function pollTick() {
+  if (!ytPlayer || !currentNode || typeof ytPlayer.getCurrentTime !== 'function') return;
+  const t = ytPlayer.getCurrentTime();
+
+  // Mid-segment choice cue
+  if (!segmentChoicesShown
+      && typeof currentNode.showChoicesAt === 'number'
+      && t >= currentNode.showChoicesAt) {
+    segmentChoicesShown = true;
+    showChoices(currentNode);
+  }
+
+  // Backstop end detection — YouTube usually fires ENDED at endSeconds,
+  // but on slow loads / certain browsers it can miss. Trigger ourselves
+  // if we've sailed past `end` without the ENDED event.
+  if (typeof currentNode.end === 'number' && t >= currentNode.end + END_BACKSTOP_TOLERANCE) {
+    stopPolling();
+    onSegmentEnded();
+  }
+}
+
+function resolveVideoId(node) {
+  return node.videoId || config.masterVideoId || null;
+}
+
+function onPlayerError(e) {
+  showStatus(`⚠️ YouTube player error (code ${e.data}).<br><small>Check that the videoId is correct and the video is Public or Unlisted.</small>`);
+}
+
+
+// ── Navigation ────────────────────────────────
+
+function navigateTo(nodeId, seekToOverride) {
+  clearChoices();
+  hideEndScreen();
+  stopPolling();
+  segmentReady = false;
+
+  const node = nodeMap[nodeId];
+  if (!node) {
+    showStatus(`⚠️ Node not found: <code>${nodeId}</code><br><small>Check your config.json for a matching id.</small>`);
+    return;
+  }
+
+  // Capture where the viewer is branching from, but only when leaving the main line
+  // (i.e. not from an aside — otherwise nested asides would clobber the original anchor).
+  if (node.returnAtCurrentTime && currentNode && !currentNode.isAside
+      && ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
+    branchContext = { nodeId: currentNode.id, currentTime: ytPlayer.getCurrentTime() };
+  }
+
+  currentNode = node;
+
+  // Update URL hash (enables back/forward and deep linking)
+  history.pushState(null, '', `#${node.id}`);
+
+  // Update header
+  $nodeTitle.textContent = node.title || '';
+  document.title = [node.title, config.title].filter(Boolean).join(' — ');
+
+  // Aside indicator
+  if (node.isAside) {
+    $asideBadge.classList.add('visible');
+    $asideBadge.textContent = node.defaultAside ? 'Aside' : 'Deep dive';
+  } else {
+    $asideBadge.classList.remove('visible');
+  }
+
+  // Pattern B: persistent skip button for default asides
+  if (node.isAside && node.defaultAside && node.returnTo) {
+    $skipBtn.textContent = `Skip → back to main`;
+    $skipBtn.classList.add('visible');
+    $skipBtn.onclick = () => navigateTo(node.returnTo);
+  } else {
+    $skipBtn.classList.remove('visible');
+    $skipBtn.onclick = null;
+  }
+
+  // Back-to-branch-point button: only meaningful when both opted in and an anchor was captured.
+  if (node.returnAtCurrentTime && branchContext) {
+    const ctx = branchContext;
+    $backBtn.textContent = '← Back to where I was';
+    $backBtn.classList.add('visible');
+    $backBtn.onclick = () => {
+      branchContext = null;
+      navigateTo(ctx.nodeId, ctx.currentTime);
+    };
+  } else {
+    $backBtn.classList.remove('visible');
+    $backBtn.onclick = null;
+  }
+
+  const videoId = resolveVideoId(node);
+  if (!videoId) {
+    showStatus(`⚠️ Node "${node.id}" has no videoId and no <code>masterVideoId</code> is set in config.`);
+    return;
+  }
+
+  // Effective start: explicit override (back-button resume) > node.start > 0.
+  const startSec = typeof seekToOverride === 'number'
+    ? seekToOverride
+    : (typeof node.start === 'number' ? node.start : 0);
+
+  // If we're resuming past the mid-segment cue, don't re-fire choices on the way back in.
+  // The end-of-segment flow will still show them when the segment finishes naturally.
+  segmentChoicesShown = typeof node.showChoicesAt === 'number' && startSec >= node.showChoicesAt;
+
+  // If we're already on this videoId, just seek instead of reloading.
+  // Avoids the black-screen reload flash when slicing one master video into many segments.
+  // Our pollTick backstop handles the new `end` boundary since YouTube's prior endSeconds
+  // is now stale.
+  const currentData = typeof ytPlayer.getVideoData === 'function' ? ytPlayer.getVideoData() : null;
+  const sameVideo = currentData && currentData.video_id === videoId;
+
+  if (sameVideo) {
+    // Only pre-arm segmentReady if the player is already PLAYING — otherwise we'd race
+    // against a spurious ENDED that can fire when seekTo() is called from ENDED state.
+    const stateBefore = (typeof ytPlayer.getPlayerState === 'function') ? ytPlayer.getPlayerState() : -1;
+    ytPlayer.seekTo(startSec, true);
+    if (typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();
+    if (stateBefore === 1) {
+      segmentReady = true;
+      startPolling();
+    }
+    // Otherwise: wait for the real PLAYING state event to flip segmentReady + start polling.
+  } else {
+    const loadArgs = { videoId, startSeconds: startSec };
+    if (typeof node.end === 'number') loadArgs.endSeconds = node.end;
+    ytPlayer.loadVideoById(loadArgs);
+    if (typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();
+  }
+
+  // Analytics hook — replace with your own event tracking if needed
+  // e.g. gtag('event', 'node_view', { node_id: node.id, node_title: node.title });
+}
+
+function onSegmentEnded() {
+  const node = currentNode;
+  if (!node) return;
+
+  // If mid-segment choices are already visible, the countdown owns the next step.
+  if ($choices.classList.contains('visible')) return;
+
+  // Resume at the original branch point if this aside opted in and we captured one.
+  if (node.returnAtCurrentTime && branchContext
+      && (!node.choices || node.choices.length === 0)) {
+    const ctx = branchContext;
+    branchContext = null;
+    navigateTo(ctx.nodeId, ctx.currentTime);
+    return;
+  }
+
+  // Aside with returnTo: auto-route back to main line
+  if (node.isAside && node.returnTo && (!node.choices || node.choices.length === 0)) {
+    navigateTo(node.returnTo);
+    return;
+  }
+
+  // Terminal node with endScreen
+  if ((!node.choices || node.choices.length === 0) && node.endScreen) {
+    showEndScreen(node.endScreen);
+    return;
+  }
+
+  // Terminal node without endScreen: show a simple replay
+  if (!node.choices || node.choices.length === 0) {
+    showEndScreen({ heading: 'That\'s a wrap.', links: [{ label: 'Watch again', target: node.id }] });
+    return;
+  }
+
+  // End-of-segment choices
+  showChoices(node);
+}
+
+
+// ── Choice UI ─────────────────────────────────
+
+function showChoices(node) {
+  clearChoices();
+
+  // Mid-segment: countdown runs until `end` is reached.
+  // End-of-segment: fall back to configured choiceDisplaySeconds.
+  let displaySeconds;
+  if (typeof node.showChoicesAt === 'number' && typeof node.end === 'number') {
+    const now = ytPlayer && typeof ytPlayer.getCurrentTime === 'function'
+      ? ytPlayer.getCurrentTime()
+      : node.showChoicesAt;
+    displaySeconds = Math.max(0, node.end - now);
+  } else {
+    displaySeconds = config.choiceDisplaySeconds ?? 8;
+  }
+
+  const defaultChoice = node.choices.find(c => c.default);
+
+  // Build buttons
+  node.choices.forEach(choice => {
+    const btn = document.createElement('button');
+    btn.className = `choice-btn ${choice.style === 'secondary' ? 'secondary' : 'primary'}`;
+    btn.textContent = choice.label;
+    btn.onclick = () => {
+      clearChoices();
+      // Analytics hook:
+      // gtag('event', 'choice_click', { from: node.id, to: choice.target, label: choice.label });
+      navigateTo(choice.target);
+    };
+    $choices.appendChild(btn);
+  });
+
+  // Countdown bar (only if there's a default to auto-fire).
+  // Tied to player state so pausing the video pauses the countdown.
+  if (defaultChoice && displaySeconds > 0) {
+    $cdWrap.style.display = 'block';
+    startCountdown(displaySeconds, () => {
+      clearChoices();
+      navigateTo(defaultChoice.target);
+    });
+  } else {
+    $cdWrap.style.display = 'none';
+  }
+
+  // Trigger CSS transition
+  requestAnimationFrame(() => $choices.classList.add('visible'));
+}
+
+function startCountdown(durationSec, onComplete) {
+  const durationMs = durationSec * 1000;
+  let elapsedMs = 0;
+  let lastTick = performance.now();
+
+  choiceTimer = setInterval(() => {
+    const now = performance.now();
+    const dt = now - lastTick;
+    lastTick = now;
+
+    // Advance only when the video is playing (1) or ended (0).
+    // Pausing (2), buffering (3), or cued (5) freezes the countdown.
+    const state = (ytPlayer && typeof ytPlayer.getPlayerState === 'function')
+      ? ytPlayer.getPlayerState()
+      : 1;
+    if (state === 1 || state === 0) elapsedMs += dt;
+
+    const fraction = Math.min(elapsedMs / durationMs, 1);
+    $cdBar.style.transform = `scaleX(${1 - fraction})`;
+
+    if (fraction >= 1) {
+      clearInterval(choiceTimer);
+      choiceTimer = null;
+      onComplete();
+    }
+  }, COUNTDOWN_TICK_MS);
+}
+
+function clearChoices() {
+  if (choiceTimer != null) clearInterval(choiceTimer);
+  choiceTimer = null;
+
+  $choices.classList.remove('visible');
+  $cdBar.style.transform = 'scaleX(1)';
+
+  // Remove all choice buttons (keep countdown-wrap)
+  Array.from($choices.querySelectorAll('.choice-btn')).forEach(b => b.remove());
+}
+
+
+// ── End screen ───────────────────────────────
+
+function showEndScreen(endScreen) {
+  $endHeading.textContent = endScreen.heading || 'The end.';
+  $endBody.textContent = endScreen.body || '';
+  $endLinks.innerHTML = '';
+
+  (endScreen.links || []).forEach((link, i) => {
+    const el = document.createElement('a');
+    el.className = 'end-link-btn';
+    el.textContent = link.label;
+
+    if (link.target) {
+      // Internal node link
+      el.href = `#${link.target}`;
+      el.onclick = (e) => { e.preventDefault(); hideEndScreen(); navigateTo(link.target); };
+    } else if (link.url) {
+      el.href = link.url;
+      el.target = '_blank';
+      el.rel = 'noopener noreferrer';
+    }
+
+    $endLinks.appendChild(el);
+  });
+
+  $endScreen.classList.add('visible');
+}
+
+function hideEndScreen() {
+  $endScreen.classList.remove('visible');
+}
+
+
+// ── Status / error ────────────────────────────
+
+function showStatus(html) {
+  $status.innerHTML = html;
+  $status.classList.add('visible');
+}
+
+function hideStatus() {
+  $status.classList.remove('visible');
+}
+
+
+// ── Chapter menu ─────────────────────────────
+
+function openMenu() {
+  buildMenuList();
+  $menu.classList.add('visible');
+  $menu.setAttribute('aria-hidden', 'false');
+  $menuToggle.setAttribute('aria-expanded', 'true');
+}
+
+function closeMenu() {
+  $menu.classList.remove('visible');
+  $menu.setAttribute('aria-hidden', 'true');
+  $menuToggle.setAttribute('aria-expanded', 'false');
+}
+
+function buildMenuList() {
+  $menuList.innerHTML = '';
+  config.nodes.forEach(raw => {
+    const node = nodeMap[raw.id];
+    if (!node) return;
+    const item = document.createElement('button');
+    item.className = 'menu-item' + (currentNode && currentNode.id === node.id ? ' current' : '');
+
+    const title = document.createElement('span');
+    title.className = 'menu-item-title';
+    title.textContent = node.title || node.id;
+    item.appendChild(title);
+
+    if (node.isAside) {
+      const badge = document.createElement('span');
+      badge.className = 'menu-item-badge';
+      badge.textContent = node.defaultAside ? 'Aside' : 'Deep dive';
+      item.appendChild(badge);
+    }
+
+    item.onclick = () => {
+      closeMenu();
+      navigateTo(node.id);
+    };
+
+    $menuList.appendChild(item);
+  });
+}
+
+$menuToggle.addEventListener('click', openMenu);
+$menuClose.addEventListener('click', closeMenu);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $menu.classList.contains('visible')) closeMenu();
+});
+
+
+// ── Browser back/forward ─────────────────────
+
+window.addEventListener('popstate', () => {
+  const hash = location.hash.replace('#', '').trim();
+  if (hash && nodeMap[hash] && hash !== currentNode?.id) {
+    navigateTo(hash);
+  }
+});
+
+
+// ── Go ────────────────────────────────────────
+init();
+</script>
+
+</body>
+</html>

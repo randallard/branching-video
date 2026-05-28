@@ -1,0 +1,51 @@
+Where we left off: 
+
+Test sequence for the resume fix:
+  1. Watch intro → chapter-1.
+  2. At ~50s, click Deep dive: an aside.
+  3. Aside plays (master 90–110). Either click the ← Back to where I was
+  button or let it play out.
+  4. You should land back inside chapter-1 at roughly where you branched
+  (master ≈52s), and the deep-dive buttons should not re-appear.
+  5. Let chapter-1 play to t=60 — the Continue choice should appear
+  normally at end of segment.
+
+  Quick menu tests:
+  - Open menu mid-video → tap any chapter → jumps in cleanly.
+  - Open menu while watching aside-default → tap intro → jumps back to
+  start of intro.
+  - Current node should always show the highlighted/bordered state.
+
+  If the chapter list looks too cluttered with the asides mixed in, we
+  can split it into "Main chapters" and "Deep dives" sections — let me
+  know how it reads on the phone.
+
+✻ Baked for 4m 4s
+
+❯ what's the point of the continue button?  it skips ahead?
+
+● You're right — on single-choice nodes, it's just a "skip the countdown"
+   button. The current model requires every node to have a default choice
+   for auto-advance to work, so single-choice nodes end up with a
+  meaningless Continue button + 8-second countdown every transition.
+  That's a lot of friction for what is conceptually just "play the next
+  segment."
+
+  Where Continue does earn its keep is on multi-choice nodes (like
+  chapter-1's "Deep dive vs Continue") — there it's the explicit "stay on
+   the main line" option.
+
+  The right behavior is probably: if a node has exactly one choice and
+  it's the default, skip the choice UI entirely and auto-advance
+  immediately. No button, no countdown, just a clean cut to the next
+  segment. Multi-choice nodes still show the UI as today.
+
+  Want me to wire that in? It'd be a 3-line change in onSegmentEnded.
+  Side effect: your intro → chapter-1 and chapter-2 → aside-default
+  transitions become seamless, but chapter-1's "Deep dive vs Continue"
+  still works exactly as it does now.
+
+
+
+  Also we might incorporate mermaid chapters
+

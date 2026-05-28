@@ -1,0 +1,84 @@
+{
+  "title": "Branching Test — Big Buck Bunny",
+  "startNode": "intro",
+  "choiceDisplaySeconds": 8,
+  "masterVideoId": "aqz-KE-bpKQ",
+
+  "_note": "Big Buck Bunny is ~10min. Segments below carve it up to exercise every feature.",
+
+  "nodes": [
+    {
+      "id": "intro",
+      "title": "Intro (0-30s)",
+      "start": 0,
+      "end": 30,
+      "choices": [
+        { "label": "Continue", "target": "chapter-1", "default": true, "style": "primary" }
+      ]
+    },
+
+    {
+      "_pattern": "Mid-segment choice (Pattern A) — choices appear at 50s while video plays toward 60s end.",
+      "id": "chapter-1",
+      "title": "Chapter 1 (30-60s, mid-segment choice at 50s)",
+      "start": 30,
+      "end": 60,
+      "showChoicesAt": 50,
+      "choices": [
+        { "label": "Deep dive: an aside", "target": "aside-optional", "style": "secondary" },
+        { "label": "Continue", "target": "chapter-2", "default": true, "style": "primary" }
+      ]
+    },
+
+    {
+      "_pattern": "Optional aside (Pattern A) — resumes the master video at the exact moment of branching. returnTo is the fallback if someone deep-links here without a branch context.",
+      "id": "aside-optional",
+      "title": "Aside (90-110s, resumes branch point)",
+      "start": 90,
+      "end": 110,
+      "isAside": true,
+      "returnAtCurrentTime": true,
+      "returnTo": "chapter-2",
+      "choices": []
+    },
+
+    {
+      "id": "chapter-2",
+      "title": "Chapter 2 (60-90s)",
+      "start": 60,
+      "end": 90,
+      "choices": [
+        { "label": "Continue", "target": "aside-default", "default": true, "style": "primary" }
+      ]
+    },
+
+    {
+      "_pattern": "Default aside (Pattern B) — persistent skip button.",
+      "id": "aside-default",
+      "title": "Default aside (110-130s, skippable)",
+      "start": 110,
+      "end": 130,
+      "isAside": true,
+      "defaultAside": true,
+      "returnTo": "outro",
+      "choices": []
+    },
+
+    {
+      "id": "outro",
+      "title": "Outro (130-160s, terminal)",
+      "start": 130,
+      "end": 160,
+      "choices": [],
+      "endScreen": {
+        "heading": "That's a wrap.",
+        "body": "Smoke test complete. Use the links below to bounce around.",
+        "links": [
+          { "label": "Watch from the beginning", "target": "intro" },
+          { "label": "Jump to the optional aside", "target": "aside-optional" },
+          { "label": "Open Big Buck Bunny on YouTube", "url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ" }
+        ]
+      }
+    }
+  ]
+}
