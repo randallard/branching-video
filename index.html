@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Branching Video</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel-2: #1f232c; --border: #2b3140;
+    --text: #e6e9ef; --muted: #9aa4b2; --accent: #5b8def; --accent-2: #3a6fd8;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--text); min-height: 100vh;
+    font: 16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 56px 24px 80px; }
+  header.hero { margin-bottom: 40px; }
+  .eyebrow { color: var(--accent); font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; }
+  h1 { font-size: 38px; line-height: 1.15; margin: 10px 0 14px; letter-spacing: -.5px; }
+  .lede { font-size: 18px; color: var(--muted); margin: 0 0 22px; max-width: 64ch; }
+  .cta-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  a.btn {
+    display: inline-block; text-decoration: none; font-weight: 600; font-size: 15px;
+    padding: 11px 18px; border-radius: 8px; border: 1px solid var(--border);
+    color: var(--text); background: var(--panel-2);
+  }
+  a.btn:hover { border-color: #3c4456; background: #242a35; }
+  a.btn.primary { background: var(--accent-2); border-color: var(--accent); }
+  a.btn.primary:hover { background: var(--accent); }
+
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 44px 0 16px; font-weight: 600; }
+  .shows { display: grid; gap: 12px; }
+  a.show {
+    display: flex; align-items: center; gap: 16px; text-decoration: none; color: inherit;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px; transition: border-color .12s, transform .12s;
+  }
+  a.show:hover { border-color: var(--accent); transform: translateY(-1px); }
+  a.show .play { font-size: 20px; color: var(--accent); flex: 0 0 auto; }
+  a.show .meta { flex: 1; min-width: 0; }
+  a.show .meta .t { font-size: 17px; font-weight: 600; }
+  a.show .meta .f { font-size: 12px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  a.show .go { color: var(--muted); font-size: 13px; flex: 0 0 auto; }
+  .empty { color: var(--muted); background: var(--panel); border: 1px dashed var(--border); border-radius: 10px; padding: 20px; }
+  footer { margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div class="eyebrow">Branching Video</div>
+      <h1>Choose-your-own-path video, built on YouTube.</h1>
+      <p class="lede">
+        An interactive video player for non-linear stories — deep dives, asides, and viewer-controlled
+        paths. Each show is just a JSON file and a single HTML player. No platform fees, no lock-in.
+      </p>
+      <div class="cta-row">
+        <a class="btn primary" href="create.html">Make your own →</a>
+        <a class="btn" href="editor.html">Open the editor</a>
+        <a class="btn" href="https://github.com/randallard/branching-video" target="_blank" rel="noopener">View on GitHub</a>
+      </div>
+    </header>
+
+    <h2>Watch a show</h2>
+    <div class="shows" id="shows">
+      <div class="empty">Loading shows…</div>
+    </div>
+
+    <footer>
+      Built with the <a href="editor.html">visual editor</a>. Want your own?
+      <a href="create.html">Fork it and start creating →</a>
+    </footer>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+  const SHOWS_DIR = 'live/';
+
+  // Prefer a live directory listing (dev server) for auto-discovery; fall back to
+  // the generated manifest.json, which is how it works on GitHub Pages.
+  async function discover() {
+    try {
+      const res = await fetch(SHOWS_DIR, { headers: { Accept: 'text/html' } });
+      if (res.ok) {
+        const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+        const files = [];
+        doc.querySelectorAll('a').forEach(a => {
+          const title = (a.getAttribute('title') || '').replace(/\/$/, '');
+          const isFolder = (a.getAttribute('class') || '').split(/\s+/).includes('folder');
+          if (!isFolder && /\.json$/i.test(title) && title !== 'manifest.json') files.push({ file: title });
+        });
+        if (files.length) return files;
+      }
+    } catch (_) { /* not served with a listing — use the manifest */ }
+    try {
+      const res = await fetch(SHOWS_DIR + 'manifest.json');
+      if (res.ok) return await res.json();
+    } catch (_) { /* no manifest either */ }
+    return [];
+  }
+
+  async function titleFor(file, known) {
+    if (known) return known;
+    try {
+      const cfg = await (await fetch(SHOWS_DIR + file)).json();
+      if (cfg && cfg.title) return cfg.title;
+    } catch (_) {}
+    return file;
+  }
+
+  async function render() {
+    const host = document.getElementById('shows');
+    const shows = await discover();
+    if (!shows.length) {
+      host.innerHTML = '<div class="empty">No shows yet. Build one in the <a href="editor.html">editor</a> and save it to the <code>live/</code> folder.</div>';
+      return;
+    }
+    const resolved = await Promise.all(shows.map(async s => ({
+      file: s.file, title: await titleFor(s.file, s.title),
+    })));
+    host.innerHTML = '';
+    resolved.forEach(s => {
+      const a = document.createElement('a');
+      a.className = 'show';
+      a.href = 'player.html?config=' + encodeURIComponent(SHOWS_DIR + s.file);
+      a.innerHTML =
+        '<span class="play">▶</span>' +
+        '<span class="meta"><span class="t"></span><span class="f"></span></span>' +
+        '<span class="go">Watch →</span>';
+      a.querySelector('.t').textContent = s.title;
+      a.querySelector('.f').textContent = SHOWS_DIR + s.file;
+      host.appendChild(a);
+    });
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

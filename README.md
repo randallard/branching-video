@@ -40,14 +40,18 @@ Both patterns are declared in `config.json`. The player handles the routing.
 
 ```
 /
+├── index.html              # Landing page — lists the shows in live/ (GitHub Pages entry point)
+├── create.html             # "Make your own" — fork + build instructions
 ├── player.html             # The entire player (HTML, CSS, JS inline — no build step)
 ├── editor.html             # Visual config editor — edit nodes/choices via forms, no hand-written JSON
-├── config.json             # Your branching graph (you create this; gitignored or committed, up to you)
-├── config.example.json     # Reference config — copy to config.json and edit
-├── configs/                # Drop extra show configs here; the editor's Configs menu lists them
+├── config.json             # Default config the player loads when no ?config= is given
+├── config.example.json     # Reference config — copy and edit
+├── live/                   # Your show configs; index.html + the editor's Configs menu list this folder
+│   └── manifest.json       # Generated list of shows (so the landing page works on GitHub Pages)
 ├── tools/
 │   ├── validate-core.js    # Shared validation rules (used by both the CLI and the editor)
-│   └── validate-config.js  # `node tools/validate-config.js config.json` — catches broken graphs
+│   ├── validate-config.js  # `node tools/validate-config.js <file>` — catches broken graphs
+│   └── gen-manifest.js     # `pnpm manifest` — rebuilds live/manifest.json
 └── README.md
 ```
 
@@ -68,7 +72,7 @@ Two ways:
 - **Visual editor (recommended)** — run the dev server and open `editor.html`. It loads the existing `config.json`, gives you a form for every field, dropdowns for `target`/`returnTo` (no typos), and live validation as you type.
   - **New…** starts a fresh config — paste a YouTube URL (or video ID) and it scaffolds `masterVideoId`, a starter `intro` node, and auto-fills the show title from YouTube; leave it blank for an empty config.
   - **Open…** loads any config file from your machine; **Save As…** asks for a file name and saves it. On Chromium desktop it writes straight to a folder you pick; in other browsers it saves to your Downloads folder (enable "ask where to save each file" in your browser settings if you want to choose the location each time).
-  - **Configs** lists every `.json` in the `configs/` folder and opens the selected one in the player (`player.html?config=…`).
+  - **Configs** lists every `.json` in the `live/` folder and opens the selected one in the player (`player.html?config=…`). After adding shows, run `pnpm manifest` so they also appear on the landing page.
   - Same zero-build, static-hostable file as the player.
 - **By hand** — see `config.example.json` for the full schema with comments. Minimum viable node:
 
@@ -260,7 +264,10 @@ For richer data, node transitions can be instrumented with custom events — see
 pnpm install
 pnpm dev          # serve . on 0.0.0.0:8080
 pnpm validate     # node tools/validate-config.js config.json
+pnpm manifest     # rebuild live/manifest.json after adding/removing shows
 ```
+
+The site entry point is `index.html` (the landing page); `editor.html` is the authoring tool. Both list shows from the `live/` folder.
 
 Then visit `http://localhost:8080/player.html#intro`.
 
@@ -278,7 +285,7 @@ This is intentionally minimal. Some natural next steps:
 - **Progress memory** — `localStorage` can remember which nodes a viewer has seen across sessions
 - **Chapter menu** — a sidebar nav built from `config.json` titles
 - **Viewer-path analytics** — log node sequences to a free [Supabase](https://supabase.com) table
-- **Multiple shows** — drop config files in `configs/` and the player loads any of them via `player.html?config=configs/show2.json` (the editor's **Configs** menu lists that folder and opens the player for you)
+- **Multiple shows** — drop config files in `live/` and the player loads any of them via `player.html?config=live/show2.json`; the landing page (`index.html`) and the editor's **Configs** menu both list that folder
 
 ---
 

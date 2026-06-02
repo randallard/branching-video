@@ -5,7 +5,8 @@
   "description": "Lightweight branching video player on top of YouTube embeds.",
   "scripts": {
     "dev": "serve . --listen tcp://0.0.0.0:8080 --no-clipboard",
-    "validate": "node tools/validate-config.js config.json"
+    "validate": "node tools/validate-config.js config.json",
+    "manifest": "node tools/gen-manifest.js live"
   },
   "devDependencies": {
     "serve": "^14.2.4"
