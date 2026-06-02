@@ -450,7 +450,12 @@
 // embeds YouTube via IFrame API.
 // ─────────────────────────────────────────────
 
-const CONFIG_URL = 'config.json';
+// Config source: `?config=relative/path.json` (same-origin relative paths only),
+// otherwise the default config.json next to this file.
+const _cfgParam = new URLSearchParams(location.search).get('config');
+const CONFIG_URL = (_cfgParam && !/^[a-z]+:/i.test(_cfgParam) && !_cfgParam.startsWith('//'))
+  ? _cfgParam
+  : 'config.json';
 const POLL_INTERVAL_MS = 250;
 const COUNTDOWN_TICK_MS = 50;
 const END_BACKSTOP_TOLERANCE = 0.25; // seconds past `end` before backstop fires

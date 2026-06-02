@@ -1,0 +1,103 @@
+{
+  "title": "AI: Terrible and Wonderful",
+  "startNode": "intro",
+  "choiceDisplaySeconds": 8,
+  "masterVideoId": "REPLACE_WITH_MASTER_VIDEO_ID",
+
+  "_schema_notes": [
+    "Top-level fields:",
+    "  title              -- browser tab + accessible label",
+    "  startNode          -- node id loaded when no #hash is present",
+    "  choiceDisplaySeconds -- countdown for end-of-segment choices (used when showChoicesAt is not set)",
+    "  masterVideoId      -- default YouTube videoId for all nodes that don't set their own",
+    "Node fields:",
+    "  id                 -- unique, used in URL hash",
+    "  title              -- shown in header and tab",
+    "  videoId            -- optional; overrides masterVideoId",
+    "  start, end         -- optional seconds into source video for this segment",
+    "  showChoicesAt      -- optional seconds; if set, choices appear mid-segment instead of at end",
+    "  choices[]          -- buttons to navigate to other nodes",
+    "  isAside            -- visual: marks the node as a deep dive",
+    "  defaultAside       -- shows persistent 'Skip -> back to main' button (requires returnTo)",
+    "  returnTo           -- node id to auto-route to when this segment ends",
+    "  endScreen          -- shown for terminal nodes (no choices, no returnTo)",
+    "Choice fields:",
+    "  label, target      -- required",
+    "  default            -- exactly one per node should be true; auto-fires after countdown",
+    "  style              -- 'primary' or 'secondary'",
+    "Any field starting with '_' is ignored by both the player and validator -- use for inline notes."
+  ],
+
+  "nodes": [
+    {
+      "id": "intro",
+      "title": "Introduction",
+      "start": 0,
+      "end": 45,
+      "choices": [
+        { "label": "Let's go", "target": "chapter-1-promises", "default": true, "style": "primary" }
+      ]
+    },
+
+    {
+      "_pattern": "Main line node with mid-segment optional aside (Pattern A)",
+      "id": "chapter-1-promises",
+      "title": "Chapter 1: The Promises",
+      "start": 45,
+      "end": 180,
+      "showChoicesAt": 165,
+      "choices": [
+        { "label": "Deep dive: How LLMs actually work", "target": "aside-how-llms-work", "style": "secondary" },
+        { "label": "Continue", "target": "chapter-2-fears", "default": true, "style": "primary" }
+      ]
+    },
+
+    {
+      "_pattern": "Optional aside (separate upload, auto-returns when done)",
+      "id": "aside-how-llms-work",
+      "title": "Deep Dive: How LLMs Work",
+      "videoId": "REPLACE_WITH_ASIDE_VIDEO_ID",
+      "isAside": true,
+      "returnTo": "chapter-2-fears",
+      "choices": []
+    },
+
+    {
+      "id": "chapter-2-fears",
+      "title": "Chapter 2: The Fears",
+      "start": 180,
+      "end": 320,
+      "choices": [
+        { "label": "Continue", "target": "aside-surveillance-default", "default": true, "style": "primary" }
+      ]
+    },
+
+    {
+      "_pattern": "Default aside (everyone sees it, persistent skip button)",
+      "id": "aside-surveillance-default",
+      "title": "The Surveillance Economy",
+      "videoId": "REPLACE_WITH_ASIDE_VIDEO_ID",
+      "isAside": true,
+      "defaultAside": true,
+      "returnTo": "chapter-3-solutions",
+      "choices": []
+    },
+
+    {
+      "_pattern": "Terminal node with end screen",
+      "id": "chapter-3-solutions",
+      "title": "Chapter 3: What Now",
+      "start": 320,
+      "end": 480,
+      "choices": [],
+      "endScreen": {
+        "heading": "That's the show.",
+        "body": "Want to go deeper? The deep dives stay available -- pick one to keep exploring.",
+        "links": [
+          { "label": "Watch from the beginning", "target": "intro" },
+          { "label": "Subscribe on YouTube", "url": "https://youtube.com/@yourchannel" }
+        ]
+      }
+    }
+  ]
+}

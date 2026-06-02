@@ -41,9 +41,12 @@ Both patterns are declared in `config.json`. The player handles the routing.
 ```
 /
 ├── player.html             # The entire player (HTML, CSS, JS inline — no build step)
+├── editor.html             # Visual config editor — edit nodes/choices via forms, no hand-written JSON
 ├── config.json             # Your branching graph (you create this; gitignored or committed, up to you)
 ├── config.example.json     # Reference config — copy to config.json and edit
+├── configs/                # Drop extra show configs here; the editor's Configs menu lists them
 ├── tools/
+│   ├── validate-core.js    # Shared validation rules (used by both the CLI and the editor)
 │   └── validate-config.js  # `node tools/validate-config.js config.json` — catches broken graphs
 └── README.md
 ```
@@ -60,7 +63,14 @@ Unlisted means the videos won't appear in search or your channel, but anyone wit
 
 ### 2. Edit config.json
 
-Define your nodes. See `config.example.json` for the full schema with comments. Minimum viable node:
+Two ways:
+
+- **Visual editor (recommended)** — run the dev server and open `editor.html`. It loads the existing `config.json`, gives you a form for every field, dropdowns for `target`/`returnTo` (no typos), and live validation as you type.
+  - **New…** starts a fresh config — paste a YouTube URL (or video ID) and it scaffolds `masterVideoId`, a starter `intro` node, and auto-fills the show title from YouTube; leave it blank for an empty config.
+  - **Open…** loads any config file from your machine; **Save As…** asks for a file name and saves it. On Chromium desktop it writes straight to a folder you pick; in other browsers it saves to your Downloads folder (enable "ask where to save each file" in your browser settings if you want to choose the location each time).
+  - **Configs** lists every `.json` in the `configs/` folder and opens the selected one in the player (`player.html?config=…`).
+  - Same zero-build, static-hostable file as the player.
+- **By hand** — see `config.example.json` for the full schema with comments. Minimum viable node:
 
 ```json
 {
@@ -268,7 +278,7 @@ This is intentionally minimal. Some natural next steps:
 - **Progress memory** — `localStorage` can remember which nodes a viewer has seen across sessions
 - **Chapter menu** — a sidebar nav built from `config.json` titles
 - **Viewer-path analytics** — log node sequences to a free [Supabase](https://supabase.com) table
-- **Multiple shows** — point the player at different config files via `?config=show2.json`
+- **Multiple shows** — drop config files in `configs/` and the player loads any of them via `player.html?config=configs/show2.json` (the editor's **Configs** menu lists that folder and opens the player for you)
 
 ---
 

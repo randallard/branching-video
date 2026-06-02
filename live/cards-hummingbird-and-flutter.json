@@ -1,0 +1,63 @@
+{
+  "title": "Cardistry | Hummingbird Tutorial by Daniel Lin",
+  "startNode": "intro",
+  "choiceDisplaySeconds": 8,
+  "masterVideoId": "mod4T6O0P6A",
+  "nodes": [
+    {
+      "id": "intro",
+      "title": "Intro",
+      "start": 0,
+      "end": 14,
+      "showChoicesAt": 0,
+      "choices": []
+    },
+    {
+      "id": "01-pull-apart",
+      "title": "Step 1: Pull Apart",
+      "start": 38,
+      "end": 42,
+      "choices": []
+    },
+    {
+      "id": "02-first-flip",
+      "title": "Step 2: Flip #1",
+      "start": 61,
+      "end": 66,
+      "choices": []
+    },
+    {
+      "id": "03-push-through",
+      "title": "Step 3: Push Through",
+      "start": 71,
+      "end": 75,
+      "choices": []
+    },
+    {
+      "id": "04-first-roll",
+      "title": "Step 4: Roll #1",
+      "start": 126,
+      "end": 130,
+      "choices": []
+    },
+    {
+      "id": "05-pull-back",
+      "title": "Step 5: Pull Back",
+      "start": 146,
+      "end": 156,
+      "choices": []
+    },
+    {
+      "id": "06-second-flip",
+      "title": "Step 6: Flip #2",
+      "start": 186,
+      "end": 194,
+      "choices": []
+    },
+    {
+      "id": "node",
+      "title": "",
+      "choices": []
+    }
+  ]
+}

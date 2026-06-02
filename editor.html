@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Branching Video — Config Editor</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1f232c;
+    --border: #2b3140;
+    --text: #e6e9ef;
+    --muted: #9aa4b2;
+    --accent: #5b8def;
+    --accent-2: #3a6fd8;
+    --danger: #e5534b;
+    --danger-bg: #2a1718;
+    --warn: #d9a441;
+    --warn-bg: #2a2516;
+    --ok: #4caf78;
+    --chip: #232834;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    flex: 0 0 auto;
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: .2px; }
+  header .spacer { flex: 1; }
+  header .filename { color: var(--muted); font-size: 12px; }
+  button {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 11px;
+    cursor: pointer;
+  }
+  button:hover { border-color: #3c4456; background: #242a35; }
+  button.primary { background: var(--accent-2); border-color: var(--accent); }
+  button.primary:hover { background: var(--accent); }
+  button.danger { color: #ffb4ae; border-color: #5a2d2c; background: var(--danger-bg); }
+  button.icon { padding: 4px 8px; line-height: 1; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+
+  main { display: flex; flex: 1; min-height: 0; }
+  .sidebar {
+    width: 280px;
+    flex: 0 0 280px;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .sidebar .section-head {
+    padding: 10px 14px 6px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: var(--muted);
+  }
+  .show-settings { padding: 4px 14px 12px; border-bottom: 1px solid var(--border); }
+  .node-list { overflow-y: auto; flex: 1; padding: 6px; }
+  .node-item {
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid transparent;
+  }
+  .node-item:hover { background: var(--panel-2); }
+  .node-item.active { background: var(--panel-2); border-color: var(--accent); }
+  .node-item .nm { flex: 1; min-width: 0; }
+  .node-item .nm .id { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .node-item .nm .ttl { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .node-item .badges { display: flex; gap: 4px; flex-shrink: 0; }
+  .badge {
+    font-size: 9px; text-transform: uppercase; letter-spacing: .5px;
+    padding: 2px 5px; border-radius: 4px; background: var(--chip); color: var(--muted);
+  }
+  .badge.start { background: #163020; color: #6ee2a3; }
+  .badge.aside { background: #2a2440; color: #b39ddb; }
+  .badge.err { background: var(--danger-bg); color: #ffb4ae; }
+
+  .editor { flex: 1; overflow-y: auto; padding: 18px 22px; min-width: 0; }
+  .editor .empty { color: var(--muted); margin-top: 40px; text-align: center; }
+
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .field .hint { font-size: 11px; color: #6b7585; margin-top: 3px; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%;
+    font: inherit;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 9px;
+  }
+  textarea { resize: vertical; min-height: 56px; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  .row { display: flex; gap: 12px; }
+  .row > .field { flex: 1; }
+  .check { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
+  .check input { width: auto; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+  }
+  .card > h2 { font-size: 13px; margin: 0 0 12px; font-weight: 600; }
+  .card > h2 .pill { font-size: 11px; color: var(--muted); font-weight: 400; }
+
+  .choice, .link-row {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+  .choice .choice-head, .link-row .link-head {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  }
+  .choice .choice-head .grip { color: var(--muted); font-size: 12px; }
+  .choice .choice-head .spacer, .link-row .link-head .spacer { flex: 1; }
+  .mini { font-size: 11px; color: var(--muted); }
+
+  .validation {
+    flex: 0 0 auto;
+    max-height: 30vh;
+    overflow-y: auto;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    padding: 10px 16px;
+  }
+  .validation .vhead { display: flex; align-items: center; gap: 10px; font-size: 12px; margin-bottom: 6px; }
+  .validation .status-ok { color: var(--ok); font-weight: 600; }
+  .validation .status-err { color: #ff8b84; font-weight: 600; }
+  .v-item { font-size: 12px; padding: 4px 8px; border-radius: 5px; margin-bottom: 3px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .v-item.err { background: var(--danger-bg); color: #ffb4ae; }
+  .v-item.warn { background: var(--warn-bg); color: #f0cf86; }
+  .add-btn { width: 100%; border-style: dashed; color: var(--muted); }
+
+  .menu-wrap { position: relative; }
+  .dropdown {
+    position: absolute; right: 0; top: calc(100% + 6px); min-width: 260px; max-width: 360px;
+    max-height: 60vh; overflow-y: auto;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px; z-index: 30; box-shadow: 0 10px 30px rgba(0,0,0,.45);
+  }
+  .dd-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 6px 7px; border-bottom: 1px solid var(--border); margin-bottom: 5px; }
+  .dd-item { display: block; width: 100%; text-align: left; border: none; background: transparent; padding: 8px 9px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dd-item:hover { background: var(--accent-2); border-color: transparent; }
+  .dd-empty { color: var(--muted); font-size: 12px; padding: 10px 8px; line-height: 1.45; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Branching Video Editor</h1>
+  <span class="filename" id="filename"></span>
+  <span class="spacer"></span>
+  <input type="file" id="fileInput" accept=".json,application/json" style="display:none" />
+  <button id="loadBtn">Open…</button>
+  <button id="newBtn" title="Start a fresh config — optionally from a YouTube video URL">New…</button>
+  <div class="menu-wrap">
+    <button id="configsBtn" title="Browse config files in the live configs/ folder and open one in the player.">Configs ▾</button>
+    <div class="dropdown" id="configsMenu" hidden></div>
+  </div>
+  <button id="playerBtn" title="Opens player.html for the selected node. Uses the config.json saved on disk, not this unsaved draft.">Play current ↗</button>
+  <button id="copyBtn">Copy JSON</button>
+  <button id="saveBtn" class="primary">Save As…</button>
+</header>
+
+<main>
+  <aside class="sidebar">
+    <div class="section-head">Show settings</div>
+    <div class="show-settings" id="showSettings"></div>
+    <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>Nodes</span>
+      <button class="icon" id="addNodeBtn" title="Add node">+ Add</button>
+    </div>
+    <div class="node-list" id="nodeList"></div>
+  </aside>
+
+  <section class="editor" id="editor"></section>
+</main>
+
+<div class="validation" id="validation"></div>
+
+<script src="tools/validate-core.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // ---- model ----------------------------------------------------------------
+  let config = blankConfig();
+  let selectedId = null;
+  let fileName = 'config.json';
+  let fileHandle = null; // File System Access handle, when the browser supports it
+  const CONFIGS_DIR = 'configs/'; // live folder the dev server lists for the Configs menu
+
+  function blankConfig() {
+    return { title: 'Untitled Show', startNode: '', choiceDisplaySeconds: 8, masterVideoId: '', nodes: [] };
+  }
+
+  function nodeIds() { return config.nodes.map(n => n.id); }
+  function getNode(id) { return config.nodes.find(n => n.id === id) || null; }
+
+  function slugify(s) {
+    return (s || 'node').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'node';
+  }
+  function uniqueId(base) {
+    let id = base, i = 2;
+    const taken = new Set(nodeIds());
+    while (taken.has(id)) { id = base + '-' + i; i++; }
+    return id;
+  }
+
+  // Cascade an id rename through every reference so the graph stays intact.
+  function renameNode(oldId, newId) {
+    if (!newId || oldId === newId) return;
+    if (nodeIds().includes(newId)) { alert('Node id "' + newId + '" is already in use.'); return false; }
+    for (const n of config.nodes) {
+      if (n.id === oldId) n.id = newId;
+      for (const c of n.choices || []) if (c.target === oldId) c.target = newId;
+      if (n.returnTo === oldId) n.returnTo = newId;
+      if (n.endScreen && Array.isArray(n.endScreen.links)) {
+        for (const l of n.endScreen.links) if (l.target === oldId) l.target = newId;
+      }
+    }
+    if (config.startNode === oldId) config.startNode = newId;
+    if (selectedId === oldId) selectedId = newId;
+    return true;
+  }
+
+  // ---- serialization (clean JSON for download + validation) -----------------
+  function serialize() {
+    const out = { title: config.title || '', startNode: config.startNode || '' };
+    if (typeof config.choiceDisplaySeconds === 'number') out.choiceDisplaySeconds = config.choiceDisplaySeconds;
+    if (config.masterVideoId) out.masterVideoId = config.masterVideoId;
+    out.nodes = config.nodes.map(n => {
+      const o = { id: n.id, title: n.title || '' };
+      if (n.videoId) o.videoId = n.videoId;
+      if (typeof n.start === 'number') o.start = n.start;
+      if (typeof n.end === 'number') o.end = n.end;
+      if (typeof n.showChoicesAt === 'number') o.showChoicesAt = n.showChoicesAt;
+      if (n.isAside) o.isAside = true;
+      if (n.defaultAside) o.defaultAside = true;
+      if (n.returnAtCurrentTime) o.returnAtCurrentTime = true;
+      if (n.returnTo) o.returnTo = n.returnTo;
+      o.choices = (n.choices || []).map(c => {
+        const co = { label: c.label || '', target: c.target || '' };
+        if (c.default) co.default = true;
+        if (c.style) co.style = c.style;
+        return co;
+      });
+      if (n.endScreen) {
+        const es = {};
+        if (n.endScreen.heading) es.heading = n.endScreen.heading;
+        if (n.endScreen.body) es.body = n.endScreen.body;
+        es.links = (n.endScreen.links || []).map(l => {
+          const lo = { label: l.label || '' };
+          if (l.url) lo.url = l.url;
+          else if (l.target) lo.target = l.target;
+          return lo;
+        });
+        o.endScreen = es;
+      }
+      return o;
+    });
+    return out;
+  }
+
+  // ---- small DOM helper -----------------------------------------------------
+  function el(tag, props, children) {
+    const e = document.createElement(tag);
+    if (props) for (const k in props) {
+      if (k === 'class') e.className = props[k];
+      else if (k === 'text') e.textContent = props[k];
+      else if (k === 'html') e.innerHTML = props[k];
+      else if (k.startsWith('on') && typeof props[k] === 'function') e.addEventListener(k.slice(2), props[k]);
+      else if (props[k] != null && props[k] !== false) e.setAttribute(k, props[k]);
+    }
+    for (const c of (children || [])) {
+      if (c == null) continue;
+      e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+    }
+    return e;
+  }
+  function field(labelText, control, hint) {
+    return el('div', { class: 'field' }, [
+      el('label', { text: labelText }),
+      control,
+      hint ? el('div', { class: 'hint', text: hint }) : null,
+    ]);
+  }
+  function numOrNull(v) {
+    if (v === '' || v == null) return null;
+    const n = Number(v);
+    return Number.isNaN(n) ? null : n;
+  }
+
+  // ---- render: lightweight (edit) vs structural -----------------------------
+  function onEdit() { renderNodeList(); runValidation(); }
+  function structural() { renderShowSettings(); renderNodeList(); renderForm(); runValidation(); }
+
+  // ---- show settings --------------------------------------------------------
+  function renderShowSettings() {
+    const host = document.getElementById('showSettings');
+    host.innerHTML = '';
+
+    const startSel = el('select', {
+      onchange: e => { config.startNode = e.target.value; onEdit(); },
+    }, [el('option', { value: '', text: '— none —' })].concat(
+      nodeIds().map(id => el('option', { value: id, text: id, selected: id === config.startNode ? 'selected' : false }))
+    ));
+
+    host.appendChild(field('Title', el('input', {
+      type: 'text', value: config.title || '',
+      oninput: e => { config.title = e.target.value; },
+    })));
+    host.appendChild(field('Start node', startSel));
+    host.appendChild(el('div', { class: 'row' }, [
+      field('Choice countdown (s)', el('input', {
+        type: 'number', min: '0', value: config.choiceDisplaySeconds ?? '',
+        oninput: e => { config.choiceDisplaySeconds = numOrNull(e.target.value); runValidation(); },
+      })),
+    ]));
+    host.appendChild(field('Master video ID', el('input', {
+      type: 'text', value: config.masterVideoId || '', placeholder: 'YouTube ID (optional)',
+      oninput: e => { config.masterVideoId = e.target.value; runValidation(); },
+    }), 'Default for nodes without their own videoId.'));
+  }
+
+  // ---- node list ------------------------------------------------------------
+  function renderNodeList() {
+    const host = document.getElementById('nodeList');
+    host.innerHTML = '';
+    // map of node id -> has error, for badge
+    const errIds = currentErrorNodeIds();
+    if (config.nodes.length === 0) {
+      host.appendChild(el('div', { class: 'mini', style: 'padding:10px', text: 'No nodes yet. Click + Add.' }));
+    }
+    config.nodes.forEach(n => {
+      const badges = el('div', { class: 'badges' }, [
+        n.id === config.startNode ? el('span', { class: 'badge start', text: 'start' }) : null,
+        n.isAside ? el('span', { class: 'badge aside', text: 'aside' }) : null,
+        errIds.has(n.id) ? el('span', { class: 'badge err', text: '!' }) : null,
+      ]);
+      const item = el('div', {
+        class: 'node-item' + (n.id === selectedId ? ' active' : ''),
+        onclick: () => { selectedId = n.id; renderNodeList(); renderForm(); },
+      }, [
+        el('div', { class: 'nm' }, [
+          el('div', { class: 'id', text: n.id || '(no id)' }),
+          el('div', { class: 'ttl', text: n.title || '' }),
+        ]),
+        badges,
+      ]);
+      host.appendChild(item);
+    });
+  }
+
+  function currentErrorNodeIds() {
+    // best-effort: pull node ids out of validator error strings of form node "id"
+    const ids = new Set();
+    try {
+      const { errors } = ConfigValidator.validate(serialize());
+      for (const e of errors) {
+        const m = e.match(/node "([^"]+)"/);
+        if (m) ids.add(m[1]);
+      }
+    } catch (_) {}
+    return ids;
+  }
+
+  // ---- node form ------------------------------------------------------------
+  function addNode() {
+    const base = uniqueId('node');
+    const n = { id: base, title: '', choices: [] };
+    config.nodes.push(n);
+    selectedId = n.id;
+    if (!config.startNode) config.startNode = n.id;
+    structural();
+  }
+
+  function deleteNode(id) {
+    const idx = config.nodes.findIndex(n => n.id === id);
+    if (idx < 0) return;
+    if (!confirm('Delete node "' + id + '"? References to it will become broken targets.')) return;
+    config.nodes.splice(idx, 1);
+    if (config.startNode === id) config.startNode = config.nodes[0] ? config.nodes[0].id : '';
+    if (selectedId === id) selectedId = config.nodes[0] ? config.nodes[0].id : null;
+    structural();
+  }
+
+  function targetSelect(value, onchange) {
+    const opts = [el('option', { value: '', text: '— select —' })];
+    const ids = nodeIds();
+    ids.forEach(id => opts.push(el('option', { value: id, text: id, selected: id === value ? 'selected' : false })));
+    // preserve a dangling reference so it's visible (and flagged by validation)
+    if (value && !ids.includes(value)) opts.push(el('option', { value: value, text: value + ' (missing!)', selected: 'selected' }));
+    return el('select', { onchange: e => onchange(e.target.value) }, opts);
+  }
+
+  function renderForm() {
+    const host = document.getElementById('editor');
+    host.innerHTML = '';
+    const n = getNode(selectedId);
+    if (!n) {
+      host.appendChild(el('div', { class: 'empty', text: 'Select a node on the left, or click + Add to create one.' }));
+      return;
+    }
+
+    // --- basics card ---
+    const basics = el('div', { class: 'card' }, [ el('h2', {}, ['Node']) ]);
+    basics.appendChild(el('div', { class: 'row' }, [
+      field('Node id', el('input', {
+        type: 'text', value: n.id,
+        onchange: e => {
+          const newId = slugify(e.target.value);
+          if (renameNode(n.id, newId) !== false) structural();
+          else renderForm();
+        },
+      }), 'Used in the URL hash. Renaming updates all references.'),
+      field('Title', el('input', {
+        type: 'text', value: n.title || '',
+        oninput: e => { n.title = e.target.value; onEdit(); },
+      })),
+    ]));
+    basics.appendChild(field('Video ID', el('input', {
+      type: 'text', value: n.videoId || '', placeholder: config.masterVideoId ? 'inherits master: ' + config.masterVideoId : 'YouTube video ID',
+      oninput: e => { n.videoId = e.target.value; runValidation(); },
+    }), 'Overrides the master video for this node. Leave blank to use the master.'));
+    basics.appendChild(el('div', { class: 'row' }, [
+      field('Start (s)', el('input', { type: 'number', min: '0', value: n.start ?? '', oninput: e => { n.start = numOrNull(e.target.value); runValidation(); } })),
+      field('End (s)', el('input', { type: 'number', min: '0', value: n.end ?? '', oninput: e => { n.end = numOrNull(e.target.value); runValidation(); } })),
+      field('Show choices at (s)', el('input', { type: 'number', min: '0', value: n.showChoicesAt ?? '', oninput: e => { n.showChoicesAt = numOrNull(e.target.value); runValidation(); } })),
+    ]));
+    host.appendChild(basics);
+
+    // --- aside / routing card ---
+    const routing = el('div', { class: 'card' }, [ el('h2', {}, ['Aside & routing']) ]);
+    routing.appendChild(checkbox('Is aside (deep dive)', !!n.isAside, v => { n.isAside = v; structural(); }));
+    routing.appendChild(checkbox('Default aside — show persistent “Skip → back to main” button', !!n.defaultAside, v => { n.defaultAside = v; runValidation(); }));
+    routing.appendChild(checkbox('Return at current time — resume the branch point on exit', !!n.returnAtCurrentTime, v => { n.returnAtCurrentTime = v; runValidation(); }));
+    routing.appendChild(field('Return to', targetSelect(n.returnTo || '', v => { n.returnTo = v || undefined; onEdit(); }),
+      'Auto-route here when this segment ends. Required for default asides / used as fallback for resume.'));
+    host.appendChild(routing);
+
+    // --- choices card ---
+    const choicesCard = el('div', { class: 'card' }, [
+      el('h2', {}, ['Choices ', el('span', { class: 'pill', text: '(' + (n.choices || []).length + ')' })]),
+    ]);
+    (n.choices || []).forEach((c, idx) => choicesCard.appendChild(renderChoice(n, c, idx)));
+    choicesCard.appendChild(el('button', {
+      class: 'add-btn',
+      onclick: () => { (n.choices = n.choices || []).push({ label: '', target: '' }); renderForm(); runValidation(); },
+    }, ['+ Add choice']));
+    host.appendChild(choicesCard);
+
+    // --- end screen card ---
+    const esCard = el('div', { class: 'card' }, [ el('h2', {}, ['End screen']) ]);
+    esCard.appendChild(checkbox('Has end screen (terminal node)', !!n.endScreen, v => {
+      n.endScreen = v ? { heading: '', body: '', links: [] } : undefined;
+      renderForm(); runValidation();
+    }));
+    if (n.endScreen) {
+      esCard.appendChild(field('Heading', el('input', { type: 'text', value: n.endScreen.heading || '', oninput: e => { n.endScreen.heading = e.target.value; } })));
+      esCard.appendChild(field('Body', el('textarea', { oninput: e => { n.endScreen.body = e.target.value; } }, [n.endScreen.body || ''])));
+      (n.endScreen.links || []).forEach((l, idx) => esCard.appendChild(renderLink(n, l, idx)));
+      esCard.appendChild(el('button', {
+        class: 'add-btn',
+        onclick: () => { (n.endScreen.links = n.endScreen.links || []).push({ label: '' }); renderForm(); runValidation(); },
+      }, ['+ Add link']));
+    }
+    host.appendChild(esCard);
+
+    // --- danger ---
+    host.appendChild(el('div', { style: 'margin-top:8px' }, [
+      el('button', { class: 'danger', onclick: () => deleteNode(n.id) }, ['Delete node']),
+    ]));
+  }
+
+  function checkbox(labelText, checked, onchange) {
+    const input = el('input', { type: 'checkbox', onchange: e => onchange(e.target.checked) });
+    if (checked) input.checked = true;
+    return el('label', { class: 'check' }, [input, el('span', { text: labelText })]);
+  }
+
+  function renderChoice(n, c, idx) {
+    const moveBtn = (dir, label) => el('button', {
+      class: 'icon', title: 'Move ' + label,
+      onclick: () => {
+        const arr = n.choices, j = idx + dir;
+        if (j < 0 || j >= arr.length) return;
+        [arr[idx], arr[j]] = [arr[j], arr[idx]];
+        renderForm(); runValidation();
+      },
+    }, [dir < 0 ? '▲' : '▼']);
+
+    const defInput = el('input', {
+      type: 'checkbox',
+      onchange: e => {
+        if (e.target.checked) n.choices.forEach((other, k) => { other.default = (k === idx); });
+        else c.default = false;
+        renderForm(); runValidation();
+      },
+    });
+    if (c.default) defInput.checked = true;
+
+    const styleSel = el('select', { onchange: e => { c.style = e.target.value || undefined; } }, [
+      el('option', { value: '', text: 'default style', selected: !c.style ? 'selected' : false }),
+      el('option', { value: 'primary', text: 'primary', selected: c.style === 'primary' ? 'selected' : false }),
+      el('option', { value: 'secondary', text: 'secondary', selected: c.style === 'secondary' ? 'selected' : false }),
+    ]);
+
+    return el('div', { class: 'choice' }, [
+      el('div', { class: 'choice-head' }, [
+        el('span', { class: 'grip', text: '#' + (idx + 1) }),
+        el('span', { class: 'spacer' }),
+        moveBtn(-1, 'up'), moveBtn(1, 'down'),
+        el('button', { class: 'icon danger', title: 'Remove choice', onclick: () => { n.choices.splice(idx, 1); renderForm(); runValidation(); } }, ['✕']),
+      ]),
+      el('div', { class: 'row' }, [
+        field('Label', el('input', { type: 'text', value: c.label || '', oninput: e => { c.label = e.target.value; runValidation(); } })),
+        field('Target', targetSelect(c.target || '', v => { c.target = v; onEdit(); })),
+      ]),
+      el('div', { class: 'row' }, [
+        el('div', { class: 'field' }, [ el('label', { text: 'Style' }), styleSel ]),
+        el('div', { class: 'field' }, [ el('label', { text: 'Default' }), el('label', { class: 'check' }, [defInput, el('span', { class: 'mini', text: 'auto-advance after countdown' })]) ]),
+      ]),
+    ]);
+  }
+
+  function renderLink(n, l, idx) {
+    return el('div', { class: 'link-row' }, [
+      el('div', { class: 'link-head' }, [
+        el('span', { class: 'mini', text: 'Link #' + (idx + 1) }),
+        el('span', { class: 'spacer' }),
+        el('button', { class: 'icon danger', title: 'Remove link', onclick: () => { n.endScreen.links.splice(idx, 1); renderForm(); runValidation(); } }, ['✕']),
+      ]),
+      field('Label', el('input', { type: 'text', value: l.label || '', oninput: e => { l.label = e.target.value; } })),
+      el('div', { class: 'row' }, [
+        field('Target node', targetSelect(l.target || '', v => { l.target = v || undefined; if (v) l.url = undefined; onEdit(); }), 'Internal jump'),
+        field('External URL', el('input', { type: 'text', value: l.url || '', placeholder: 'https://…', oninput: e => { l.url = e.target.value || undefined; if (e.target.value) l.target = undefined; runValidation(); } }), 'Use instead of target'),
+      ]),
+    ]);
+  }
+
+  // ---- validation panel -----------------------------------------------------
+  function runValidation() {
+    const host = document.getElementById('validation');
+    host.innerHTML = '';
+    let res;
+    try { res = ConfigValidator.validate(serialize()); }
+    catch (e) { res = { errors: ['Validator crashed: ' + e.message], warnings: [] }; }
+
+    const head = el('div', { class: 'vhead' }, [
+      res.errors.length
+        ? el('span', { class: 'status-err', text: res.errors.length + ' error' + (res.errors.length === 1 ? '' : 's') })
+        : el('span', { class: 'status-ok', text: '✓ Valid' }),
+      el('span', { class: 'mini', text: res.warnings.length + ' warning' + (res.warnings.length === 1 ? '' : 's') }),
+      el('span', { class: 'mini', text: '· ' + config.nodes.length + ' nodes' }),
+    ]);
+    host.appendChild(head);
+    res.errors.forEach(e => host.appendChild(el('div', { class: 'v-item err', text: e })));
+    res.warnings.forEach(w => host.appendChild(el('div', { class: 'v-item warn', text: w })));
+  }
+
+  // ---- load / save ----------------------------------------------------------
+  function loadConfig(obj, name) {
+    config = Object.assign(blankConfig(), obj);
+    config.nodes = (obj.nodes || []).map(n => Object.assign({}, n, { choices: n.choices || [] }));
+    if (typeof config.choiceDisplaySeconds !== 'number') config.choiceDisplaySeconds = 8;
+    selectedId = config.nodes[0] ? config.nodes[0].id : null;
+    fileHandle = null; // loaded by value; openFile() reattaches a handle if it has one
+    if (name) { fileName = name; setFilename(name); }
+    structural();
+  }
+
+  function setFilename(label) { document.getElementById('filename').textContent = label || ''; }
+
+  // Save As… — name the file in-app (works identically in every browser), then
+  // save it. Where it lands is up to your browser's download setting: enable
+  // "ask where to save each file" to get a folder chooser; otherwise it goes to
+  // your Downloads folder. (A native folder+name "Save As" dialog from a web page
+  // requires the File System Access API, which not every browser implements well.)
+  function fsaSaveWorks() {
+    const uad = navigator.userAgentData;
+    return !!(window.showSaveFilePicker && uad &&
+      (uad.brands || []).some(b => /Chromium|Google Chrome|Microsoft Edge/i.test(b.brand)));
+  }
+
+  async function saveAs() {
+    const text = JSON.stringify(serialize(), null, 2) + '\n';
+    const entered = prompt('Save as — file name:', fileName || 'config.json');
+    if (entered === null) return; // cancelled
+    let name = entered.trim() || 'config.json';
+    if (!/\.json$/i.test(name)) name += '.json';
+
+    // Use the File System Access API only on Chromium-based desktop browsers,
+    // where its save picker is a genuine folder+name "Save As" dialog. Other
+    // engines expose an open-only picker (or none), so they take the download
+    // path below instead. navigator.userAgentData is itself Chromium-only.
+    if (fsaSaveWorks()) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: name,
+          types: [{ description: 'JSON config', accept: { 'application/json': ['.json'] } }],
+        });
+        const w = await handle.createWritable();
+        await w.write(text);
+        await w.close();
+        fileHandle = handle;
+        fileName = handle.name;
+        setFilename(fileName + ' · saved');
+        flash('saveBtn', 'Saved!');
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return; // user cancelled the picker
+        // anything else (incl. browsers whose picker is unusable): fall through
+      }
+    }
+
+    fileName = name;
+    setFilename(name);
+    const blob = new Blob([text], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = el('a', { href: url, download: name });
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    flash('saveBtn', 'Saved ↓');
+  }
+
+  // Open… — prefer the FSA open picker (keeps a handle for save-back), else the
+  // classic hidden file input.
+  async function openFile() {
+    if (window.showOpenFilePicker) {
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          types: [{ description: 'JSON config', accept: { 'application/json': ['.json'] } }],
+        });
+        const file = await handle.getFile();
+        loadConfig(JSON.parse(await file.text()), file.name);
+        fileHandle = handle;
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;
+        alert('Could not open file: ' + e.message);
+        return;
+      }
+    }
+    document.getElementById('fileInput').click();
+  }
+
+  // ---- Configs folder menu (live listing from the dev server) ---------------
+  async function listConfigFiles() {
+    const res = await fetch(CONFIGS_DIR, { headers: { Accept: 'text/html' } });
+    if (!res.ok) throw new Error(res.status + '');
+    const html = await res.text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const files = [];
+    doc.querySelectorAll('a').forEach(a => {
+      const title = (a.getAttribute('title') || '').replace(/\/$/, '');
+      const isFolder = (a.getAttribute('class') || '').split(/\s+/).includes('folder');
+      if (!isFolder && /\.json$/i.test(title)) files.push(title);
+    });
+    files.sort((x, y) => x.localeCompare(y));
+    return files;
+  }
+
+  function closeConfigsMenu() { document.getElementById('configsMenu').hidden = true; }
+
+  async function openConfigsMenu() {
+    const menu = document.getElementById('configsMenu');
+    menu.hidden = false;
+    menu.innerHTML = '';
+    menu.appendChild(el('div', { class: 'dd-head' }, [
+      el('span', { class: 'mini', text: 'Play a config from /' + CONFIGS_DIR }),
+      el('button', { class: 'icon', title: 'Refresh', onclick: e => { e.stopPropagation(); openConfigsMenu(); } }, ['⟳']),
+    ]));
+    let files;
+    try {
+      files = await listConfigFiles();
+    } catch (e) {
+      menu.appendChild(el('div', { class: 'dd-empty' }, [
+        'Could not read /' + CONFIGS_DIR + ' (' + e.message + '). ',
+        'Run the dev server (pnpm dev) and create a configs/ folder with .json files.',
+      ]));
+      return;
+    }
+    if (!files.length) {
+      menu.appendChild(el('div', { class: 'dd-empty', text: 'No .json files in /' + CONFIGS_DIR + ' yet.' }));
+      return;
+    }
+    files.forEach(name => menu.appendChild(el('button', {
+      class: 'dd-item', title: 'Open ' + name + ' in the player',
+      onclick: () => { window.open('player.html?config=' + encodeURIComponent(CONFIGS_DIR + name), '_blank'); closeConfigsMenu(); },
+    }, ['▶  ' + name])));
+  }
+
+  async function copyJson() {
+    const text = JSON.stringify(serialize(), null, 2);
+    try { await navigator.clipboard.writeText(text); flash('copyBtn', 'Copied!'); }
+    catch (_) { window.prompt('Copy the JSON:', text); }
+  }
+
+  function flash(btnId, msg) {
+    const b = document.getElementById(btnId);
+    const old = b.textContent; b.textContent = msg;
+    setTimeout(() => { b.textContent = old; }, 1200);
+  }
+
+  // ---- new config from a video URL ------------------------------------------
+  // Accepts a full YouTube URL (watch / youtu.be / embed / shorts / live), a
+  // bare 11-char id, or anything containing one. Returns '' if none found.
+  function extractVideoId(input) {
+    if (!input) return '';
+    const s = input.trim();
+    if (/^[A-Za-z0-9_-]{11}$/.test(s)) return s;
+    try {
+      const u = new URL(s);
+      const host = u.hostname.replace(/^www\./, '');
+      if (host === 'youtu.be') return u.pathname.slice(1).split('/')[0] || '';
+      if (host.endsWith('youtube.com') || host.endsWith('youtube-nocookie.com')) {
+        if (u.searchParams.get('v')) return u.searchParams.get('v');
+        const parts = u.pathname.split('/').filter(Boolean);
+        const i = parts.findIndex(p => ['embed', 'shorts', 'v', 'live'].includes(p));
+        if (i >= 0 && parts[i + 1]) return parts[i + 1];
+      }
+      return ''; // a valid URL, but not a recognizable YouTube video link
+    } catch (_) { /* not a URL — fall through to a loose match on free text */ }
+    const m = s.match(/[A-Za-z0-9_-]{11}/);
+    return m ? m[0] : '';
+  }
+
+  // Best-effort show title via YouTube's keyless oEmbed endpoint (CORS-enabled).
+  async function fetchVideoTitle(id) {
+    try {
+      const r = await fetch('https://www.youtube.com/oembed?format=json&url=' +
+        encodeURIComponent('https://www.youtube.com/watch?v=' + id));
+      if (!r.ok) return null;
+      return (await r.json()).title || null;
+    } catch (_) { return null; }
+  }
+
+  async function newConfig() {
+    if (config.nodes.length && !confirm('Discard the current draft and start fresh?')) return;
+    const input = prompt('Paste a YouTube video URL or ID to start from\n(or leave blank for an empty config):', '');
+    if (input === null) return; // cancelled
+    const fresh = blankConfig();
+    const id = extractVideoId(input);
+    if (input.trim() && !id) alert('Could not find a YouTube video ID in that input — starting empty.');
+    if (id) {
+      fresh.masterVideoId = id;
+      fresh.startNode = 'intro';
+      fresh.nodes = [{ id: 'intro', title: 'Intro', start: 0, choices: [] }];
+    }
+    loadConfig(fresh, 'config.json');
+    if (id) {
+      const title = await fetchVideoTitle(id);
+      if (title) { config.title = title; renderShowSettings(); }
+    }
+  }
+
+  // ---- wire up --------------------------------------------------------------
+  document.getElementById('addNodeBtn').addEventListener('click', addNode);
+  document.getElementById('saveBtn').addEventListener('click', saveAs);
+  document.getElementById('copyBtn').addEventListener('click', copyJson);
+  document.getElementById('newBtn').addEventListener('click', newConfig);
+  document.getElementById('loadBtn').addEventListener('click', openFile);
+  document.getElementById('configsBtn').addEventListener('click', e => {
+    e.stopPropagation();
+    const m = document.getElementById('configsMenu');
+    if (m.hidden) openConfigsMenu(); else closeConfigsMenu();
+  });
+  document.addEventListener('click', e => { if (!e.target.closest('.menu-wrap')) closeConfigsMenu(); });
+  document.getElementById('fileInput').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try { loadConfig(JSON.parse(reader.result), file.name); }
+      catch (err) { alert('Could not parse JSON: ' + err.message); }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+  document.getElementById('playerBtn').addEventListener('click', () => {
+    const hash = selectedId ? '#' + selectedId : '';
+    window.open('player.html' + hash, '_blank');
+  });
+
+  // Try to preload the config.json sitting next to this file (works under the dev server).
+  fetch('config.json')
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(obj => loadConfig(obj, 'config.json'))
+    .catch(() => { loadConfig(blankConfig(), 'config.json'); });
+})();
+</script>
+</body>
+</html>
