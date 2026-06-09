@@ -174,6 +174,27 @@
   .dd-item { display: block; width: 100%; text-align: left; border: none; background: transparent; padding: 8px 9px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .dd-item:hover { background: var(--accent-2); border-color: transparent; }
   .dd-empty { color: var(--muted); font-size: 12px; padding: 10px 8px; line-height: 1.45; }
+
+  @media (max-width: 640px) {
+    header { flex-wrap: wrap; gap: 6px; padding: 8px 10px; }
+    header h1 { font-size: 13px; }
+    header .spacer { display: none; }
+    header .filename { order: 10; width: 100%; font-size: 11px; padding-top: 2px; }
+    #playerBtn, #copyBtn { display: none; }
+    main { flex-direction: column; }
+    .sidebar { width: 100%; flex: none; border-right: none; border-bottom: 1px solid var(--border); max-height: 50vh; }
+    .editor { padding: 12px 14px; }
+    .row { flex-direction: column; gap: 0; }
+    .validation { max-height: 22vh; padding: 7px 12px; }
+    .validation .v-item { font-size: 11px; }
+    /* mobile nav: sidebar hides when a node is selected, editor panel shows */
+    body.node-selected .sidebar { display: none; }
+    body.node-selected main { display: block; }
+    .back-btn { display: flex; }
+  }
+  @media (min-width: 641px) {
+    .back-btn { display: none !important; }
+  }
 </style>
 </head>
 <body>
@@ -188,6 +209,7 @@
     <button id="configsBtn" title="Browse config files in the live configs/ folder and open one in the player.">Configs ▾</button>
     <div class="dropdown" id="configsMenu" hidden></div>
   </div>
+  <button class="back-btn" id="backBtn">← Nodes</button>
   <button id="playerBtn" title="Opens player.html for the selected node. Uses the config.json saved on disk, not this unsaved draft.">Play current ↗</button>
   <button id="copyBtn">Copy JSON</button>
   <button id="saveBtn" class="primary">Save As…</button>
@@ -430,9 +452,11 @@
     host.innerHTML = '';
     const n = getNode(selectedId);
     if (!n) {
+      document.body.classList.remove('node-selected');
       host.appendChild(el('div', { class: 'empty', text: 'Select a node on the left, or click + Add to create one.' }));
       return;
     }
+    document.body.classList.add('node-selected');
 
     // --- basics card ---
     const basics = el('div', { class: 'card' }, [ el('h2', {}, ['Node']) ]);
@@ -792,6 +816,12 @@
   document.getElementById('copyBtn').addEventListener('click', copyJson);
   document.getElementById('newBtn').addEventListener('click', newConfig);
   document.getElementById('loadBtn').addEventListener('click', openFile);
+  document.getElementById('backBtn').addEventListener('click', () => {
+    selectedId = null;
+    document.body.classList.remove('node-selected');
+    renderNodeList();
+    renderForm();
+  });
   document.getElementById('configsBtn').addEventListener('click', e => {
     e.stopPropagation();
     const m = document.getElementById('configsMenu');
