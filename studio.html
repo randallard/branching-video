@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Branching Video Studio</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel-2: #1f232c; --border: #2b3140;
+    --text: #e6e9ef; --muted: #9aa4b2; --accent: #5b8def; --accent-2: #3a6fd8;
+    --danger: #e5534b; --danger-bg: #2a1718; --ok: #4caf78;
+    --warn: #d9a441; --warn-bg: #2a2516;
+    --mark: #f59e0b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, -apple-system, sans-serif; }
+  body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+  /* ── Header ── */
+  #hdr {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #hdr h1 { font-size: 14px; font-weight: 700; white-space: nowrap; }
+  #hdr .spacer { flex: 1; }
+  #hdr .status { font-size: 12px; color: var(--muted); }
+  button {
+    font: inherit; color: var(--text); background: var(--panel-2);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 11px; cursor: pointer;
+  }
+  button:hover { border-color: #3c4456; background: #242a35; }
+  button.primary { background: var(--accent-2); border-color: var(--accent); }
+  button.primary:hover { background: var(--accent); }
+  button.danger { color: #ffb4ae; border-color: #5a2d2c; background: var(--danger-bg); }
+  button.mark { background: rgba(245,158,11,.15); border-color: rgba(245,158,11,.5); color: var(--mark); font-weight: 700; }
+  button.mark:hover { background: rgba(245,158,11,.28); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.icon { padding: 4px 8px; }
+
+  /* ── Setup screen ── */
+  #setup {
+    flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .setup-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 32px; width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 16px;
+  }
+  .setup-card h2 { font-size: 18px; font-weight: 700; }
+  .setup-card p { color: var(--muted); font-size: 13px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%; font: inherit; color: var(--text); background: var(--panel-2);
+    border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+
+  /* ── Main workspace ── */
+  #workspace { flex: 1; display: none; flex-direction: column; min-height: 0; }
+  #workspace.visible { display: flex; }
+
+  /* player + sidebar */
+  #work-row { display: flex; flex: 1; min-height: 0; }
+
+  #player-col {
+    flex: 1; display: flex; flex-direction: column; min-width: 0;
+    border-right: 1px solid var(--border);
+  }
+
+  #yt-wrap {
+    position: relative; background: #000;
+    /* 16:9 aspect ratio */
+    aspect-ratio: 16/9; width: 100%; max-height: 55vh; flex-shrink: 0;
+  }
+  #yt-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* transport bar */
+  #transport {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 8px 12px; background: var(--panel); border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #timecode {
+    font: 700 15px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--mark); min-width: 70px; letter-spacing: .5px;
+  }
+  .nudge-group { display: flex; gap: 4px; }
+
+  /* node list in player col */
+  #node-table-wrap { flex: 1; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    position: sticky; top: 0; background: var(--panel); padding: 7px 10px;
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .6px;
+    color: var(--muted); border-bottom: 1px solid var(--border);
+  }
+  tbody tr { border-bottom: 1px solid rgba(255,255,255,.04); cursor: pointer; }
+  tbody tr:hover { background: var(--panel-2); }
+  tbody tr.selected { background: rgba(91,141,239,.12); }
+  tbody td { padding: 8px 10px; vertical-align: middle; }
+  .td-id { font-weight: 600; }
+  .td-time { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--muted); }
+  .td-choices { font-size: 12px; color: var(--muted); }
+  .unresolved { color: var(--warn); }
+
+  /* ── Sidebar (node form) ── */
+  #sidebar {
+    width: 320px; flex-shrink: 0; display: flex; flex-direction: column;
+    overflow-y: auto; background: var(--panel);
+  }
+  #sidebar .sidebar-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px 8px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  #sidebar .sidebar-head h3 { font-size: 13px; font-weight: 700; }
+  #sidebar-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .hint { font-size: 11px; color: #6b7585; }
+  .row2 { display: flex; gap: 10px; }
+  .row2 > .field { flex: 1; }
+
+  .choice-item {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 7px;
+    padding: 10px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .choice-item .choice-row { display: flex; gap: 8px; align-items: flex-end; }
+  .choice-item .choice-row > .field { flex: 1; }
+  .check { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .check input { width: auto; }
+  .add-btn { width: 100%; border-style: dashed; color: var(--muted); }
+  .badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; text-transform: uppercase; }
+  .badge-warn { background: var(--warn-bg); color: var(--warn); border: 1px solid rgba(217,164,65,.3); }
+  .sidebar-empty { color: var(--muted); font-size: 13px; padding: 20px 14px; }
+
+  .danger-zone { padding: 14px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <h1>Studio</h1>
+  <span class="status" id="status-label"></span>
+  <span class="spacer"></span>
+  <button id="newBtn" title="Start a new show">New…</button>
+  <button id="resumeBtn" title="Pick up where you left off">Resume draft…</button>
+  <button id="saveBtn" class="primary" disabled>Save</button>
+  <button id="editBtn" disabled title="Open current draft in the form editor">Open in Editor</button>
+  <button id="playBtn" disabled title="Play the current draft">Play ▶</button>
+  <button id="exportBtn" disabled>Export JSON</button>
+</div>
+
+<!-- Phase 1: setup -->
+<div id="setup">
+  <div class="setup-card">
+    <h2>New show</h2>
+    <p>Paste a YouTube URL or video ID to start. You'll mark node timestamps while watching.</p>
+    <div class="field">
+      <label>YouTube URL or video ID</label>
+      <input type="text" id="videoInput" placeholder="https://youtube.com/watch?v=… or dQw4w9WgXcQ" />
+    </div>
+    <div class="field">
+      <label>Show title</label>
+      <input type="text" id="titleInput" placeholder="Auto-filled from YouTube, or enter manually" />
+    </div>
+    <div class="field">
+      <label>Choice countdown (seconds)</label>
+      <input type="number" id="countdownInput" value="8" min="1" max="60" style="width:100px" />
+    </div>
+    <button class="primary" id="startBtn">Load video →</button>
+    <div id="setup-err" style="color:#ff8b84;font-size:12px;display:none"></div>
+  </div>
+</div>
+
+<!-- Phase 2+: workspace -->
+<div id="workspace">
+  <div id="work-row">
+    <!-- left: player + transport + node table -->
+    <div id="player-col">
+      <div id="yt-wrap">
+        <div id="yt-player"></div>
+      </div>
+
+      <div id="transport">
+        <span id="timecode">0:00.0</span>
+        <button class="icon" id="playPauseBtn" title="Space">▶</button>
+        <div class="nudge-group">
+          <button class="icon" id="back5" title="-5s">«5</button>
+          <button class="icon" id="back1" title="-1s">«1</button>
+          <button class="icon" id="fwd1" title="+1s">1»</button>
+          <button class="icon" id="fwd5" title="+5s">5»</button>
+        </div>
+        <button class="mark" id="markStartBtn">⏺ Mark node start</button>
+        <button class="icon" id="setEndBtn" title="Set end of selected node to current time" disabled>Set end</button>
+      </div>
+
+      <div id="node-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Title</th><th>Start</th><th>End</th><th>Choices</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="nodeTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- right: selected node form -->
+    <div id="sidebar">
+      <div class="sidebar-head">
+        <h3 id="sidebar-title">Node details</h3>
+      </div>
+      <div id="sidebar-body">
+        <div class="sidebar-empty" id="sidebar-empty">Select a node from the list to edit it, or mark a start point to create one.</div>
+      </div>
+      <div class="danger-zone" id="danger-zone" style="display:none">
+        <button class="danger" id="deleteNodeBtn">Delete node</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+// ── Storage ─────────────────────────────────────────────────────────────────
+const LS_INDEX = 'bvp:index';
+function lsKey(slug) { return 'bvp:config:' + slug; }
+
+function saveToLS(cfg) {
+  const slug = slugify(cfg.title || 'untitled');
+  localStorage.setItem(lsKey(slug), JSON.stringify(cfg));
+  // update index
+  let idx = [];
+  try { idx = JSON.parse(localStorage.getItem(LS_INDEX) || '[]'); } catch (_) {}
+  const existing = idx.findIndex(e => e.slug === slug);
+  const entry = { slug, title: cfg.title || 'Untitled', modified: Date.now() };
+  if (existing >= 0) idx[existing] = entry; else idx.push(entry);
+  localStorage.setItem(LS_INDEX, JSON.stringify(idx));
+  return slug;
+}
+
+function loadFromLS(slug) {
+  try { return JSON.parse(localStorage.getItem(lsKey(slug))); } catch (_) { return null; }
+}
+
+function lsIndex() {
+  try { return JSON.parse(localStorage.getItem(LS_INDEX) || '[]'); } catch (_) { return []; }
+}
+
+// ── State ────────────────────────────────────────────────────────────────────
+let config = null;   // the working config object
+let slug = null;     // current LS slug
+let selectedId = null;
+let ytPlayer = null;
+let ytReady = false;
+let tcInterval = null;
+
+// ── Utils ────────────────────────────────────────────────────────────────────
+function slugify(s) {
+  return (s || 'untitled').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'untitled';
+}
+function uniqueId(base, taken) {
+  let id = base, i = 2;
+  const s = new Set(taken);
+  while (s.has(id)) { id = base + '-' + i; i++; }
+  return id;
+}
+function fmtTime(s) {
+  if (s == null || isNaN(s)) return '—';
+  const m = Math.floor(s / 60), sec = (s % 60).toFixed(1).padStart(4, '0');
+  return m + ':' + sec;
+}
+function extractVideoId(input) {
+  if (!input) return '';
+  const s = input.trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(s)) return s;
+  try {
+    const u = new URL(s);
+    const host = u.hostname.replace(/^www\./, '');
+    if (host === 'youtu.be') return u.pathname.slice(1).split('/')[0] || '';
+    if (host.endsWith('youtube.com') || host.endsWith('youtube-nocookie.com')) {
+      if (u.searchParams.get('v')) return u.searchParams.get('v');
+      const parts = u.pathname.split('/').filter(Boolean);
+      const i = parts.findIndex(p => ['embed','shorts','v','live'].includes(p));
+      if (i >= 0 && parts[i+1]) return parts[i+1];
+    }
+    return '';
+  } catch (_) {}
+  const m = s.match(/[A-Za-z0-9_-]{11}/);
+  return m ? m[0] : '';
+}
+async function fetchVideoTitle(id) {
+  try {
+    const r = await fetch('https://www.youtube.com/oembed?format=json&url=' +
+      encodeURIComponent('https://www.youtube.com/watch?v=' + id));
+    if (!r.ok) return null;
+    return (await r.json()).title || null;
+  } catch (_) { return null; }
+}
+
+// ── Setup screen ─────────────────────────────────────────────────────────────
+const $setup = document.getElementById('setup');
+const $workspace = document.getElementById('workspace');
+const $setupErr = document.getElementById('setup-err');
+
+document.getElementById('startBtn').addEventListener('click', async () => {
+  const raw = document.getElementById('videoInput').value;
+  const id = extractVideoId(raw);
+  if (!id) {
+    $setupErr.textContent = 'Could not find a YouTube video ID in that input.';
+    $setupErr.style.display = 'block';
+    return;
+  }
+  $setupErr.style.display = 'none';
+  const title = document.getElementById('titleInput').value.trim();
+  const countdown = parseInt(document.getElementById('countdownInput').value, 10) || 8;
+  config = {
+    title: title || 'Untitled Show',
+    masterVideoId: id,
+    startNode: '',
+    choiceDisplaySeconds: countdown,
+    nodes: [],
+  };
+  // async title fetch — update if field was blank
+  if (!title) {
+    fetchVideoTitle(id).then(t => {
+      if (t) {
+        config.title = t;
+        autoSave();
+        setStatusLabel();
+      }
+    });
+  }
+  enterWorkspace();
+});
+
+document.getElementById('newBtn').addEventListener('click', () => {
+  if (config && !confirm('Start a new show? Unsaved changes will be lost.')) return;
+  resetToSetup();
+});
+
+document.getElementById('resumeBtn').addEventListener('click', () => {
+  const idx = lsIndex();
+  if (!idx.length) { alert('No saved drafts found.'); return; }
+  const opts = idx.map((e, i) => `${i+1}: ${e.title} (${new Date(e.modified).toLocaleDateString()})`).join('\n');
+  const ans = prompt('Choose a draft (enter number):\n' + opts);
+  if (ans === null) return;
+  const i = parseInt(ans, 10) - 1;
+  if (isNaN(i) || i < 0 || i >= idx.length) { alert('Invalid choice.'); return; }
+  const saved = loadFromLS(idx[i].slug);
+  if (!saved) { alert('Could not load draft.'); return; }
+  config = saved;
+  slug = idx[i].slug;
+  enterWorkspace();
+});
+
+function resetToSetup() {
+  config = null; slug = null; selectedId = null;
+  stopTcInterval();
+  $workspace.classList.remove('visible');
+  $setup.style.display = '';
+  document.getElementById('videoInput').value = '';
+  document.getElementById('titleInput').value = '';
+  document.getElementById('saveBtn').disabled = true;
+  document.getElementById('editBtn').disabled = true;
+  document.getElementById('playBtn').disabled = true;
+  document.getElementById('exportBtn').disabled = true;
+}
+
+// ── Workspace ─────────────────────────────────────────────────────────────────
+function enterWorkspace() {
+  $setup.style.display = 'none';
+  $workspace.classList.add('visible');
+  document.getElementById('saveBtn').disabled = false;
+  document.getElementById('editBtn').disabled = false;
+  document.getElementById('playBtn').disabled = false;
+  document.getElementById('exportBtn').disabled = false;
+  autoSave();
+  loadYouTubeAPI();
+  renderTable();
+  renderSidebar();
+}
+
+function autoSave() {
+  if (!config) return;
+  slug = saveToLS(config);
+  setStatusLabel('Saved');
+}
+
+function setStatusLabel(msg) {
+  document.getElementById('status-label').textContent =
+    msg || (config ? (config.title || 'Untitled') : '');
+}
+
+// ── YouTube ───────────────────────────────────────────────────────────────────
+function loadYouTubeAPI() {
+  if (window.YT && window.YT.Player) { onYTReady(); return; }
+  window.onYouTubeIframeAPIReady = onYTReady;
+  const s = document.createElement('script');
+  s.src = 'https://www.youtube.com/iframe_api';
+  document.head.appendChild(s);
+}
+
+function onYTReady() {
+  if (ytPlayer) {
+    ytPlayer.loadVideoById({ videoId: config.masterVideoId });
+    ytPlayer.pauseVideo();
+    return;
+  }
+  ytPlayer = new YT.Player('yt-player', {
+    width: '100%', height: '100%',
+    videoId: config.masterVideoId,
+    playerVars: { autoplay: 0, controls: 1, rel: 0, modestbranding: 1, iv_load_policy: 3, enablejsapi: 1 },
+    events: {
+      onReady: () => { ytReady = true; startTcInterval(); },
+      onStateChange: e => {
+        document.getElementById('playPauseBtn').textContent = e.data === 1 ? '⏸' : '▶';
+      },
+    },
+  });
+}
+
+function currentTime() {
+  if (!ytReady || !ytPlayer || typeof ytPlayer.getCurrentTime !== 'function') return 0;
+  return ytPlayer.getCurrentTime();
+}
+
+function startTcInterval() {
+  if (tcInterval) return;
+  tcInterval = setInterval(() => {
+    document.getElementById('timecode').textContent = fmtTime(currentTime());
+  }, 100);
+}
+function stopTcInterval() { if (tcInterval) clearInterval(tcInterval); tcInterval = null; }
+
+// ── Transport controls ────────────────────────────────────────────────────────
+document.getElementById('playPauseBtn').addEventListener('click', togglePlay);
+document.getElementById('back5').addEventListener('click', () => seek(-5));
+document.getElementById('back1').addEventListener('click', () => seek(-1));
+document.getElementById('fwd1').addEventListener('click', () => seek(1));
+document.getElementById('fwd5').addEventListener('click', () => seek(5));
+document.addEventListener('keydown', e => {
+  if (!$workspace.classList.contains('visible')) return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+  if (e.code === 'ArrowLeft' && e.shiftKey) seek(-5);
+  else if (e.code === 'ArrowLeft') seek(-1);
+  if (e.code === 'ArrowRight' && e.shiftKey) seek(5);
+  else if (e.code === 'ArrowRight') seek(1);
+});
+
+function togglePlay() {
+  if (!ytReady) return;
+  const state = ytPlayer.getPlayerState();
+  state === 1 ? ytPlayer.pauseVideo() : ytPlayer.playVideo();
+}
+function seek(delta) {
+  if (!ytReady) return;
+  ytPlayer.seekTo(Math.max(0, currentTime() + delta), true);
+}
+
+// ── Mark node start ───────────────────────────────────────────────────────────
+document.getElementById('markStartBtn').addEventListener('click', markStart);
+document.getElementById('setEndBtn').addEventListener('click', setEndNow);
+
+function markStart() {
+  const t = parseFloat(currentTime().toFixed(1));
+  const ids = config.nodes.map(n => n.id);
+
+  // auto-close previous node's end if open
+  if (config.nodes.length) {
+    const last = config.nodes[config.nodes.length - 1];
+    if (last.end == null) last.end = t;
+  }
+
+  const rawTitle = prompt('Node title (leave blank to use a generated id):', '');
+  if (rawTitle === null) return; // cancelled
+  const base = slugify(rawTitle || 'node');
+  const id = uniqueId(base, ids);
+  const node = { id, title: rawTitle || id, start: t, end: null, choices: [] };
+  config.nodes.push(node);
+  if (!config.startNode) config.startNode = id;
+  selectedId = id;
+  autoSave();
+  renderTable();
+  renderSidebar();
+  document.getElementById('setEndBtn').disabled = false;
+}
+
+function setEndNow() {
+  const node = config.nodes.find(n => n.id === selectedId);
+  if (!node) return;
+  node.end = parseFloat(currentTime().toFixed(1));
+  autoSave();
+  renderTable();
+  renderSidebar();
+}
+
+// ── Node table ────────────────────────────────────────────────────────────────
+function renderTable() {
+  const tbody = document.getElementById('nodeTableBody');
+  tbody.innerHTML = '';
+  config.nodes.forEach(n => {
+    const unresolved = (n.choices || []).filter(c => c.target && !config.nodes.find(x => x.id === c.target)).length;
+    const tr = document.createElement('tr');
+    if (n.id === selectedId) tr.classList.add('selected');
+    tr.innerHTML =
+      `<td class="td-id">${esc(n.id)}</td>` +
+      `<td>${esc(n.title || '')}</td>` +
+      `<td class="td-time">${fmtTime(n.start)}</td>` +
+      `<td class="td-time">${fmtTime(n.end)}</td>` +
+      `<td class="td-choices">${
+        (n.choices||[]).length
+          ? (n.choices.length + (unresolved ? ` <span class="unresolved" title="${unresolved} unresolved">⚠</span>` : ''))
+          : '<span style="color:var(--muted)">—</span>'
+      }</td>` +
+      `<td><button class="icon" data-seek="${n.start}">⏩</button></td>`;
+    tr.addEventListener('click', e => {
+      if (e.target.closest('[data-seek]')) {
+        const t = parseFloat(e.target.closest('[data-seek]').dataset.seek);
+        if (ytReady && !isNaN(t)) ytPlayer.seekTo(t, true);
+        return;
+      }
+      selectedId = n.id;
+      document.getElementById('setEndBtn').disabled = false;
+      renderTable();
+      renderSidebar();
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Sidebar (node form) ───────────────────────────────────────────────────────
+function renderSidebar() {
+  const node = config.nodes.find(n => n.id === selectedId);
+  const $empty = document.getElementById('sidebar-empty');
+  const $body = document.getElementById('sidebar-body');
+  const $dz = document.getElementById('danger-zone');
+  const $title = document.getElementById('sidebar-title');
+
+  if (!node) {
+    $empty.style.display = '';
+    $dz.style.display = 'none';
+    $title.textContent = 'Node details';
+    // clear dynamic children except empty placeholder
+    Array.from($body.children).forEach(c => { if (c !== $empty) c.remove(); });
+    return;
+  }
+  $empty.style.display = 'none';
+  $dz.style.display = '';
+  $title.textContent = node.id;
+  Array.from($body.children).forEach(c => { if (c !== $empty) c.remove(); });
+
+  // ID
+  $body.appendChild(mkField('Node ID', mkInput('text', node.id, v => {
+    if (!v || v === node.id) return;
+    if (config.nodes.find(x => x.id === v)) { alert('ID already in use.'); return; }
+    // rename all references
+    config.nodes.forEach(x => {
+      (x.choices||[]).forEach(c => { if (c.target === node.id) c.target = v; });
+      if (x.returnTo === node.id) x.returnTo = v;
+    });
+    if (config.startNode === node.id) config.startNode = v;
+    node.id = v;
+    selectedId = v;
+    autoSave(); renderTable(); renderSidebar();
+  }), 'Rename updates all references.'));
+
+  // Title
+  $body.appendChild(mkField('Title', mkInput('text', node.title || '', v => {
+    node.title = v; autoSave(); renderTable();
+  })));
+
+  // Start / End row
+  const row = document.createElement('div');
+  row.className = 'row2';
+  row.appendChild(mkField('Start (s)', mkInput('number', node.start ?? '', v => {
+    node.start = v === '' ? null : parseFloat(v);
+    autoSave(); renderTable();
+  })));
+  const endField = mkField('End (s)', mkInput('number', node.end ?? '', v => {
+    node.end = v === '' ? null : parseFloat(v);
+    autoSave(); renderTable();
+  }));
+  row.appendChild(endField);
+  $body.appendChild(row);
+
+  // Return to
+  $body.appendChild(mkField('Return to', mkSelect(
+    [['', '— none —'], ...config.nodes.filter(x => x.id !== node.id).map(x => [x.id, x.id])],
+    node.returnTo || '',
+    v => { node.returnTo = v || undefined; autoSave(); }
+  ), 'Auto-route here when segment ends.'));
+
+  // Choices heading
+  const ch = document.createElement('div');
+  ch.style = 'font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-top:4px;';
+  ch.textContent = 'Choices';
+  $body.appendChild(ch);
+
+  (node.choices || []).forEach((c, idx) => {
+    $body.appendChild(mkChoiceItem(node, c, idx));
+  });
+
+  const addChoiceBtn = document.createElement('button');
+  addChoiceBtn.className = 'add-btn';
+  addChoiceBtn.textContent = '+ Add choice';
+  addChoiceBtn.addEventListener('click', () => {
+    (node.choices = node.choices || []).push({ label: '', target: '', default: false });
+    autoSave(); renderSidebar();
+  });
+  $body.appendChild(addChoiceBtn);
+}
+
+function mkChoiceItem(node, c, idx) {
+  const wrap = document.createElement('div');
+  wrap.className = 'choice-item';
+
+  const headRow = document.createElement('div');
+  headRow.style = 'display:flex;justify-content:space-between;align-items:center;';
+  const lbl = document.createElement('span');
+  lbl.style = 'font-size:11px;color:var(--muted);';
+  lbl.textContent = 'Choice ' + (idx + 1);
+  const del = document.createElement('button');
+  del.className = 'icon danger';
+  del.textContent = '✕';
+  del.addEventListener('click', () => {
+    node.choices.splice(idx, 1); autoSave(); renderTable(); renderSidebar();
+  });
+  headRow.appendChild(lbl); headRow.appendChild(del);
+  wrap.appendChild(headRow);
+
+  const cr = document.createElement('div');
+  cr.className = 'choice-row';
+  cr.appendChild(mkField('Label', mkInput('text', c.label || '', v => { c.label = v; autoSave(); })));
+
+  // target with unresolved warning
+  const targetIds = config.nodes.filter(x => x.id !== node.id).map(x => [x.id, x.id]);
+  const targetSel = mkSelect([['', '— select —'], ...targetIds], c.target || '', v => {
+    c.target = v; autoSave(); renderTable(); renderSidebar();
+  });
+  const tf = mkField('Target', targetSel);
+  if (c.target && !config.nodes.find(x => x.id === c.target)) {
+    const w = document.createElement('span');
+    w.className = 'badge badge-warn'; w.textContent = 'Missing';
+    tf.appendChild(w);
+  }
+  cr.appendChild(tf);
+  wrap.appendChild(cr);
+
+  const defRow = document.createElement('div');
+  defRow.style = 'display:flex;gap:16px;align-items:center;';
+  const defCheck = document.createElement('label');
+  defCheck.className = 'check';
+  const cb = document.createElement('input');
+  cb.type = 'checkbox'; cb.checked = !!c.default;
+  cb.addEventListener('change', e => {
+    if (e.target.checked) node.choices.forEach((x,k) => { x.default = k === idx; });
+    else c.default = false;
+    autoSave(); renderSidebar();
+  });
+  defCheck.appendChild(cb);
+  defCheck.appendChild(Object.assign(document.createElement('span'), { textContent: 'Default (auto-advance)' }));
+  defRow.appendChild(defCheck);
+
+  const styleSel = mkSelect([['','default'],['primary','primary'],['secondary','secondary']], c.style || '', v => {
+    c.style = v || undefined; autoSave();
+  });
+  defRow.appendChild(mkField('Style', styleSel));
+  wrap.appendChild(defRow);
+
+  return wrap;
+}
+
+function mkField(labelText, control, hint) {
+  const f = document.createElement('div');
+  f.className = 'field';
+  if (labelText) {
+    const l = document.createElement('label');
+    l.textContent = labelText;
+    f.appendChild(l);
+  }
+  if (control) f.appendChild(control);
+  if (hint) {
+    const h = document.createElement('div');
+    h.className = 'hint'; h.textContent = hint;
+    f.appendChild(h);
+  }
+  return f;
+}
+
+function mkInput(type, value, onchange) {
+  const i = document.createElement('input');
+  i.type = type; i.value = value ?? '';
+  i.addEventListener('change', e => onchange(e.target.value));
+  return i;
+}
+
+function mkSelect(options, value, onchange) {
+  const s = document.createElement('select');
+  options.forEach(([v, t]) => {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = t;
+    if (v === value) o.selected = true;
+    s.appendChild(o);
+  });
+  s.addEventListener('change', e => onchange(e.target.value));
+  return s;
+}
+
+// ── Header actions ────────────────────────────────────────────────────────────
+document.getElementById('saveBtn').addEventListener('click', () => {
+  autoSave();
+  alert('Saved to browser storage.');
+});
+
+document.getElementById('editBtn').addEventListener('click', () => {
+  if (!config) return;
+  localStorage.setItem('bvp:transfer', JSON.stringify(serialize()));
+  window.open('editor.html#transfer', '_blank');
+});
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  if (!config) return;
+  localStorage.setItem('bvp:transfer', JSON.stringify(serialize()));
+  const hash = config.startNode ? '#' + config.startNode : '';
+  window.open('player.html?config=transfer' + hash, '_blank');
+});
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const text = JSON.stringify(serialize(), null, 2) + '\n';
+  const name = slugify(config.title || 'config') + '.json';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+});
+
+document.getElementById('deleteNodeBtn').addEventListener('click', () => {
+  const node = config.nodes.find(n => n.id === selectedId);
+  if (!node) return;
+  if (!confirm('Delete node "' + node.id + '"?')) return;
+  config.nodes = config.nodes.filter(n => n.id !== selectedId);
+  if (config.startNode === selectedId) config.startNode = config.nodes[0]?.id || '';
+  selectedId = config.nodes[0]?.id || null;
+  autoSave(); renderTable(); renderSidebar();
+});
+
+// ── Serialize (clean output matching the schema) ──────────────────────────────
+function serialize() {
+  const out = {
+    title: config.title || '',
+    startNode: config.startNode || '',
+    choiceDisplaySeconds: config.choiceDisplaySeconds ?? 8,
+  };
+  if (config.masterVideoId) out.masterVideoId = config.masterVideoId;
+  out.nodes = config.nodes.map(n => {
+    const o = { id: n.id, title: n.title || '', choices: [] };
+    if (typeof n.start === 'number') o.start = n.start;
+    if (typeof n.end === 'number') o.end = n.end;
+    if (n.returnTo) o.returnTo = n.returnTo;
+    o.choices = (n.choices || []).map(c => {
+      const co = { label: c.label || '', target: c.target || '' };
+      if (c.default) co.default = true;
+      if (c.style) co.style = c.style;
+      return co;
+    });
+    return o;
+  });
+  return out;
+}
+
+// ── Boot: check for a previous session ───────────────────────────────────────
+(function boot() {
+  const idx = lsIndex();
+  const btn = document.getElementById('resumeBtn');
+  if (!idx.length) btn.disabled = true;
+
+  // If index.html sent us a specific draft to resume, load it immediately.
+  const resumeSlug = localStorage.getItem('bvp:resume');
+  if (resumeSlug) {
+    localStorage.removeItem('bvp:resume');
+    const saved = loadFromLS(resumeSlug);
+    if (saved) { config = saved; slug = resumeSlug; enterWorkspace(); return; }
+  }
+})();
+
+})();
+</script>
+</body>
+</html>

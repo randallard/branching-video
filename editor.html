@@ -970,6 +970,14 @@
   });
 
   // Try to preload the config.json sitting next to this file (works under the dev server).
+  // If opened via studio "Open in Editor", consume the transfer key from localStorage.
+  if (location.hash === '#transfer') {
+    history.replaceState(null, '', location.pathname + location.search);
+    try {
+      const raw = localStorage.getItem('bvp:transfer');
+      if (raw) { loadConfig(JSON.parse(raw), 'transfer.json'); return; }
+    } catch (_) {}
+  }
   fetch('config.json')
     .then(r => r.ok ? r.json() : Promise.reject())
     .then(obj => loadConfig(obj, 'config.json'))

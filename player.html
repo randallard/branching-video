@@ -522,9 +522,15 @@ const $menuList    = document.getElementById('menu-list');
 async function init() {
   showStatus('Loading…');
   try {
-    const res = await fetch(CONFIG_URL);
-    if (!res.ok) throw new Error(`Could not load ${CONFIG_URL} (${res.status})`);
-    config = await res.json();
+    if (_cfgParam === 'transfer') {
+      const raw = localStorage.getItem('bvp:transfer');
+      if (!raw) throw new Error('No transfer config found in browser storage.');
+      config = JSON.parse(raw);
+    } else {
+      const res = await fetch(CONFIG_URL);
+      if (!res.ok) throw new Error(`Could not load ${CONFIG_URL} (${res.status})`);
+      config = await res.json();
+    }
   } catch (e) {
     showStatus(`⚠️ ${e.message}<br><small>Make sure config.json is in the same directory as player.html</small>`);
     return;
