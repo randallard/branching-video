@@ -400,6 +400,28 @@
     }
 
     #status.visible { display: flex; }
+
+    #menu-footer {
+      flex-shrink: 0;
+      border-top: 1px solid var(--border);
+    }
+    .menu-index-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 14px 16px;
+      border: none;
+      background: none;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 14px;
+      text-align: left;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background var(--transition), color var(--transition);
+    }
+    .menu-index-link:hover { background: rgba(255,255,255,0.06); color: var(--text); }
   </style>
 </head>
 <body>
@@ -418,6 +440,9 @@
       <button id="menu-close" aria-label="Close chapter menu">×</button>
     </div>
     <ul id="menu-list"></ul>
+    <div id="menu-footer">
+      <a href="index.html" class="menu-index-link" id="menu-index-link">&#8592; All shows</a>
+    </div>
   </nav>
 
   <div id="player-wrap">
@@ -922,6 +947,11 @@ function closeMenu() {
 
 function buildMenuList() {
   $menuList.innerHTML = '';
+
+  // Update index link label from config title if available
+  const indexLink = document.getElementById('menu-index-link');
+  if (indexLink && config.title) indexLink.textContent = '\u2190 ' + config.title + ' — All shows';
+
   config.nodes.forEach(raw => {
     const node = nodeMap[raw.id];
     if (!node) return;
@@ -945,7 +975,9 @@ function buildMenuList() {
       navigateTo(node.id);
     };
 
-    $menuList.appendChild(item);
+    const li = document.createElement('li');
+    li.appendChild(item);
+    $menuList.appendChild(li);
   });
 }
 
