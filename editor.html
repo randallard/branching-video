@@ -176,24 +176,56 @@
   .dd-empty { color: var(--muted); font-size: 12px; padding: 10px 8px; line-height: 1.45; }
 
   @media (max-width: 640px) {
-    header { flex-wrap: wrap; gap: 6px; padding: 8px 10px; }
-    header h1 { font-size: 13px; }
-    header .spacer { display: none; }
-    header .filename { order: 10; width: 100%; font-size: 11px; padding-top: 2px; }
-    #playerBtn, #copyBtn { display: none; }
+    header { gap: 6px; padding: 8px 10px; }
+    header h1 { font-size: 13px; flex: 1; }
+    header .spacer, header .filename, #loadBtn, #newBtn, #configsBtn,
+    #playerBtn, #copyBtn, .menu-wrap { display: none !important; }
+    #mobile-menu-btn { display: flex; }
     main { flex-direction: column; }
-    .sidebar { width: 100%; flex: none; border-right: none; border-bottom: 1px solid var(--border); max-height: 50vh; }
-    .editor { padding: 12px 14px; }
+    .sidebar { display: none; }
+    .editor { padding: 12px 14px; overflow-y: auto; flex: 1; }
     .row { flex-direction: column; gap: 0; }
-    .validation { max-height: 22vh; padding: 7px 12px; }
+    .validation { max-height: none; padding: 7px 12px; flex: 0 0 auto; }
     .validation .v-item { font-size: 11px; }
-    /* mobile nav: sidebar hides when a node is selected, editor panel shows */
-    body.node-selected .sidebar { display: none; }
-    body.node-selected main { display: block; }
-    .back-btn { display: flex; }
   }
   @media (min-width: 641px) {
-    .back-btn { display: none !important; }
+    #mobile-menu-btn { display: none !important; }
+    #mobile-drawer { display: none !important; }
+  }
+
+  /* ── Mobile drawer ── */
+  #mobile-drawer {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    flex-direction: column;
+    background: var(--panel);
+  }
+  #mobile-drawer.open { display: flex; }
+  #mobile-drawer-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #mobile-drawer-head h2 { font-size: 14px; font-weight: 600; margin: 0; flex: 1; }
+  #mobile-drawer-actions {
+    display: flex;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+  #mobile-drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
   }
 </style>
 </head>
@@ -209,11 +241,33 @@
     <button id="configsBtn" title="Browse config files in the live configs/ folder and open one in the player.">Configs ▾</button>
     <div class="dropdown" id="configsMenu" hidden></div>
   </div>
-  <button class="back-btn" id="backBtn">← Nodes</button>
+  <button id="mobile-menu-btn" aria-label="Open menu" style="display:none">☰</button>
   <button id="playerBtn" title="Opens player.html for the selected node. Uses the config.json saved on disk, not this unsaved draft.">Play current ↗</button>
   <button id="copyBtn">Copy JSON</button>
   <button id="saveBtn" class="primary">Save As…</button>
 </header>
+
+<div id="mobile-drawer" role="dialog" aria-modal="true" aria-label="Menu">
+  <div id="mobile-drawer-head">
+    <h2>Branching Video Editor</h2>
+    <button id="mobile-drawer-close" aria-label="Close menu">✕</button>
+  </div>
+  <div id="mobile-drawer-actions">
+    <button id="mobileLoadBtn">Open…</button>
+    <button id="mobileNewBtn">New…</button>
+    <button id="mobileSaveBtn" class="primary">Save As…</button>
+    <button id="mobilePlayerBtn">Play ↗</button>
+  </div>
+  <div id="mobile-drawer-body">
+    <div class="section-head">Show settings</div>
+    <div class="show-settings" id="mobileShowSettings"></div>
+    <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>Nodes</span>
+      <button class="icon" id="mobileAddNodeBtn">+ Add</button>
+    </div>
+    <div class="node-list" id="mobileNodeList"></div>
+  </div>
+</div>
 
 <main>
   <aside class="sidebar">
@@ -351,59 +405,69 @@
 
   // ---- show settings --------------------------------------------------------
   function renderShowSettings() {
-    const host = document.getElementById('showSettings');
-    host.innerHTML = '';
+    for (const hostId of ['showSettings', 'mobileShowSettings']) {
+      const host = document.getElementById(hostId);
+      if (!host) continue;
+      host.innerHTML = '';
 
-    const startSel = el('select', {
-      onchange: e => { config.startNode = e.target.value; onEdit(); },
-    }, [el('option', { value: '', text: '— none —' })].concat(
-      nodeIds().map(id => el('option', { value: id, text: id, selected: id === config.startNode ? 'selected' : false }))
-    ));
+      const startSel = el('select', {
+        onchange: e => { config.startNode = e.target.value; onEdit(); },
+      }, [el('option', { value: '', text: '— none —' })].concat(
+        nodeIds().map(id => el('option', { value: id, text: id, selected: id === config.startNode ? 'selected' : false }))
+      ));
 
-    host.appendChild(field('Title', el('input', {
-      type: 'text', value: config.title || '',
-      oninput: e => { config.title = e.target.value; },
-    })));
-    host.appendChild(field('Start node', startSel));
-    host.appendChild(el('div', { class: 'row' }, [
-      field('Choice countdown (s)', el('input', {
-        type: 'number', min: '0', value: config.choiceDisplaySeconds ?? '',
-        oninput: e => { config.choiceDisplaySeconds = numOrNull(e.target.value); runValidation(); },
-      })),
-    ]));
-    host.appendChild(field('Master video ID', el('input', {
-      type: 'text', value: config.masterVideoId || '', placeholder: 'YouTube ID (optional)',
-      oninput: e => { config.masterVideoId = e.target.value; runValidation(); },
-    }), 'Default for nodes without their own videoId.'));
+      host.appendChild(field('Title', el('input', {
+        type: 'text', value: config.title || '',
+        oninput: e => { config.title = e.target.value; },
+      })));
+      host.appendChild(field('Start node', startSel));
+      host.appendChild(el('div', { class: 'row' }, [
+        field('Choice countdown (s)', el('input', {
+          type: 'number', min: '0', value: config.choiceDisplaySeconds ?? '',
+          oninput: e => { config.choiceDisplaySeconds = numOrNull(e.target.value); runValidation(); },
+        })),
+      ]));
+      host.appendChild(field('Master video ID', el('input', {
+        type: 'text', value: config.masterVideoId || '', placeholder: 'YouTube ID (optional)',
+        oninput: e => { config.masterVideoId = e.target.value; runValidation(); },
+      }), 'Default for nodes without their own videoId.'));
+    }
   }
 
   // ---- node list ------------------------------------------------------------
   function renderNodeList() {
-    const host = document.getElementById('nodeList');
-    host.innerHTML = '';
-    // map of node id -> has error, for badge
     const errIds = currentErrorNodeIds();
-    if (config.nodes.length === 0) {
-      host.appendChild(el('div', { class: 'mini', style: 'padding:10px', text: 'No nodes yet. Click + Add.' }));
+    for (const hostId of ['nodeList', 'mobileNodeList']) {
+      const host = document.getElementById(hostId);
+      if (!host) continue;
+      host.innerHTML = '';
+      if (config.nodes.length === 0) {
+        host.appendChild(el('div', { class: 'mini', style: 'padding:10px', text: 'No nodes yet. Click + Add.' }));
+      }
+      config.nodes.forEach(n => {
+        const badges = el('div', { class: 'badges' }, [
+          n.id === config.startNode ? el('span', { class: 'badge start', text: 'start' }) : null,
+          n.isAside ? el('span', { class: 'badge aside', text: 'aside' }) : null,
+          errIds.has(n.id) ? el('span', { class: 'badge err', text: '!' }) : null,
+        ]);
+        const item = el('div', {
+          class: 'node-item' + (n.id === selectedId ? ' active' : ''),
+          onclick: () => {
+            selectedId = n.id;
+            closeMobileDrawer();
+            renderNodeList();
+            renderForm();
+          },
+        }, [
+          el('div', { class: 'nm' }, [
+            el('div', { class: 'id', text: n.id || '(no id)' }),
+            el('div', { class: 'ttl', text: n.title || '' }),
+          ]),
+          badges,
+        ]);
+        host.appendChild(item);
+      });
     }
-    config.nodes.forEach(n => {
-      const badges = el('div', { class: 'badges' }, [
-        n.id === config.startNode ? el('span', { class: 'badge start', text: 'start' }) : null,
-        n.isAside ? el('span', { class: 'badge aside', text: 'aside' }) : null,
-        errIds.has(n.id) ? el('span', { class: 'badge err', text: '!' }) : null,
-      ]);
-      const item = el('div', {
-        class: 'node-item' + (n.id === selectedId ? ' active' : ''),
-        onclick: () => { selectedId = n.id; renderNodeList(); renderForm(); },
-      }, [
-        el('div', { class: 'nm' }, [
-          el('div', { class: 'id', text: n.id || '(no id)' }),
-          el('div', { class: 'ttl', text: n.title || '' }),
-        ]),
-        badges,
-      ]);
-      host.appendChild(item);
-    });
   }
 
   function currentErrorNodeIds() {
@@ -453,11 +517,9 @@
     host.innerHTML = '';
     const n = getNode(selectedId);
     if (!n) {
-      document.body.classList.remove('node-selected');
-      host.appendChild(el('div', { class: 'empty', text: 'Select a node on the left, or click + Add to create one.' }));
+      host.appendChild(el('div', { class: 'empty', text: 'Select a node from the menu, or click + Add to create one.' }));
       return;
     }
-    document.body.classList.add('node-selected');
 
     // --- basics card ---
     const basics = el('div', { class: 'card' }, [ el('h2', {}, ['Node']) ]);
@@ -831,24 +893,34 @@
     return confirm('You have unsaved changes.\n\nClick "Cancel" to go back and use Save As… to save your work first.\nClick "OK" to discard changes and continue.');
   }
 
+  // ---- mobile drawer --------------------------------------------------------
+  function openMobileDrawer() { document.getElementById('mobile-drawer').classList.add('open'); }
+  function closeMobileDrawer() { document.getElementById('mobile-drawer').classList.remove('open'); }
+
   // ---- wire up --------------------------------------------------------------
   document.getElementById('addNodeBtn').addEventListener('click', addNode);
   document.getElementById('saveBtn').addEventListener('click', saveAs);
   document.getElementById('copyBtn').addEventListener('click', copyJson);
   document.getElementById('newBtn').addEventListener('click', newConfig);
   document.getElementById('loadBtn').addEventListener('click', openFile);
-  document.getElementById('backBtn').addEventListener('click', () => {
-    selectedId = null;
-    document.body.classList.remove('node-selected');
-    renderNodeList();
-    renderForm();
-  });
   document.getElementById('configsBtn').addEventListener('click', e => {
     e.stopPropagation();
     const m = document.getElementById('configsMenu');
     if (m.hidden) openConfigsMenu(); else closeConfigsMenu();
   });
   document.addEventListener('click', e => { if (!e.target.closest('.menu-wrap')) closeConfigsMenu(); });
+
+  // mobile drawer
+  document.getElementById('mobile-menu-btn').addEventListener('click', openMobileDrawer);
+  document.getElementById('mobile-drawer-close').addEventListener('click', closeMobileDrawer);
+  document.getElementById('mobileAddNodeBtn').addEventListener('click', () => { closeMobileDrawer(); addNode(); });
+  document.getElementById('mobileSaveBtn').addEventListener('click', saveAs);
+  document.getElementById('mobileLoadBtn').addEventListener('click', openFile);
+  document.getElementById('mobileNewBtn').addEventListener('click', newConfig);
+  document.getElementById('mobilePlayerBtn').addEventListener('click', () => {
+    const hash = selectedId ? '#' + selectedId : '';
+    window.open('player.html' + hash, '_blank');
+  });
   document.getElementById('fileInput').addEventListener('change', e => {
     const file = e.target.files[0];
     if (!file) return;
