@@ -241,7 +241,7 @@
     <button id="configsBtn" title="Browse config files in the live configs/ folder and open one in the player.">Configs ▾</button>
     <div class="dropdown" id="configsMenu" hidden></div>
   </div>
-  <button id="mobile-menu-btn" aria-label="Open menu" style="display:none">☰</button>
+  <button id="mobile-menu-btn" aria-label="Open menu">☰</button>
   <button id="playerBtn" title="Opens player.html for the selected node. Uses the config.json saved on disk, not this unsaved draft.">Play current ↗</button>
   <button id="copyBtn">Copy JSON</button>
   <button id="saveBtn" class="primary">Save As…</button>
@@ -688,9 +688,38 @@
     dirty = false;
     if (name) { fileName = name; setFilename(name); }
     structural();
+    updateSaveLabel();
   }
 
   function setFilename(label) { document.getElementById('filename').textContent = label || ''; }
+
+  function updateSaveLabel() {
+    const label = (fileHandle || fileName !== 'config.json') ? 'Save' : 'Save As…';
+    document.getElementById('saveBtn').textContent = label;
+    document.getElementById('mobileSaveBtn').textContent = label;
+  }
+
+  // Save — writes back to the open file handle if we have one, otherwise Save As.
+  async function save() {
+    if (fileHandle) {
+      try {
+        const text = JSON.stringify(serialize(), null, 2) + '\n';
+        const w = await fileHandle.createWritable();
+        await w.write(text);
+        await w.close();
+        setFilename(fileName + ' · saved');
+        dirty = false;
+        flash('saveBtn', 'Saved!');
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;
+        // handle gone (e.g. file deleted) — fall through to saveAs
+        fileHandle = null;
+        updateSaveLabel();
+      }
+    }
+    await saveAs();
+  }
 
   // Save As… — name the file in-app (works identically in every browser), then
   // save it. Where it lands is up to your browser's download setting: enable
@@ -727,6 +756,7 @@
         fileName = handle.name;
         setFilename(fileName + ' · saved');
         dirty = false;
+        updateSaveLabel();
         flash('saveBtn', 'Saved!');
         return;
       } catch (e) {
@@ -743,6 +773,7 @@
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
     dirty = false;
+    updateSaveLabel();
     flash('saveBtn', 'Saved ↓');
   }
 
@@ -758,6 +789,7 @@
         const file = await handle.getFile();
         loadConfig(JSON.parse(await file.text()), file.name);
         fileHandle = handle;
+        updateSaveLabel();
         return;
       } catch (e) {
         if (e && e.name === 'AbortError') return;
@@ -899,7 +931,7 @@
 
   // ---- wire up --------------------------------------------------------------
   document.getElementById('addNodeBtn').addEventListener('click', addNode);
-  document.getElementById('saveBtn').addEventListener('click', saveAs);
+  document.getElementById('saveBtn').addEventListener('click', save);
   document.getElementById('copyBtn').addEventListener('click', copyJson);
   document.getElementById('newBtn').addEventListener('click', newConfig);
   document.getElementById('loadBtn').addEventListener('click', openFile);
@@ -914,7 +946,7 @@
   document.getElementById('mobile-menu-btn').addEventListener('click', openMobileDrawer);
   document.getElementById('mobile-drawer-close').addEventListener('click', closeMobileDrawer);
   document.getElementById('mobileAddNodeBtn').addEventListener('click', () => { closeMobileDrawer(); addNode(); });
-  document.getElementById('mobileSaveBtn').addEventListener('click', saveAs);
+  document.getElementById('mobileSaveBtn').addEventListener('click', save);
   document.getElementById('mobileLoadBtn').addEventListener('click', openFile);
   document.getElementById('mobileNewBtn').addEventListener('click', newConfig);
   document.getElementById('mobilePlayerBtn').addEventListener('click', () => {
