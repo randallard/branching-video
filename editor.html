@@ -241,6 +241,7 @@
   let selectedId = null;
   let fileName = 'config.json';
   let fileHandle = null; // File System Access handle, when the browser supports it
+  let dirty = false;
   const CONFIGS_DIR = 'live/'; // shows folder the dev server lists for the Configs menu
 
   function blankConfig() {
@@ -345,8 +346,8 @@
   }
 
   // ---- render: lightweight (edit) vs structural -----------------------------
-  function onEdit() { renderNodeList(); runValidation(); }
-  function structural() { renderShowSettings(); renderNodeList(); renderForm(); runValidation(); }
+  function onEdit() { dirty = true; renderNodeList(); runValidation(); }
+  function structural() { dirty = true; renderShowSettings(); renderNodeList(); renderForm(); runValidation(); }
 
   // ---- show settings --------------------------------------------------------
   function renderShowSettings() {
@@ -523,7 +524,8 @@
     host.appendChild(esCard);
 
     // --- danger ---
-    host.appendChild(el('div', { style: 'margin-top:8px' }, [
+    host.appendChild(el('div', { style: 'margin-top:8px;display:flex;gap:8px;' }, [
+      el('button', { onclick: addNode }, ['+ Add next node']),
       el('button', { class: 'danger', onclick: () => deleteNode(n.id) }, ['Delete node']),
     ]));
   }
@@ -621,6 +623,7 @@
     if (typeof config.choiceDisplaySeconds !== 'number') config.choiceDisplaySeconds = 8;
     selectedId = config.nodes[0] ? config.nodes[0].id : null;
     fileHandle = null; // loaded by value; openFile() reattaches a handle if it has one
+    dirty = false;
     if (name) { fileName = name; setFilename(name); }
     structural();
   }
@@ -661,6 +664,7 @@
         fileHandle = handle;
         fileName = handle.name;
         setFilename(fileName + ' · saved');
+        dirty = false;
         flash('saveBtn', 'Saved!');
         return;
       } catch (e) {
@@ -676,12 +680,14 @@
     const a = el('a', { href: url, download: name });
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
+    dirty = false;
     flash('saveBtn', 'Saved ↓');
   }
 
   // Open… — prefer the FSA open picker (keeps a handle for save-back), else the
   // classic hidden file input.
   async function openFile() {
+    if (!confirmDiscard()) return;
     if (window.showOpenFilePicker) {
       try {
         const [handle] = await window.showOpenFilePicker({
@@ -792,7 +798,7 @@
   }
 
   async function newConfig() {
-    if (config.nodes.length && !confirm('Discard the current draft and start fresh?')) return;
+    if (config.nodes.length && !confirmDiscard()) return;
     const input = prompt('Paste a YouTube video URL or ID to start from\n(or leave blank for an empty config):', '');
     if (input === null) return; // cancelled
     const fresh = blankConfig();
@@ -808,6 +814,21 @@
       const title = await fetchVideoTitle(id);
       if (title) { config.title = title; renderShowSettings(); }
     }
+  }
+
+  // ---- unsaved-changes guardrail -------------------------------------------
+  // beforeunload covers: browser back/forward, tab close, refresh, typed URL.
+  window.addEventListener('beforeunload', e => {
+    if (!dirty) return;
+    e.preventDefault();
+    e.returnValue = ''; // required for Chrome to show the native dialog
+  });
+
+  // For in-app actions that would discard state (New…, Open…), show a richer
+  // confirm that names "Save As…" so the user knows what to do.
+  function confirmDiscard() {
+    if (!dirty) return true;
+    return confirm('You have unsaved changes.\n\nClick "Cancel" to go back and use Save As… to save your work first.\nClick "OK" to discard changes and continue.');
   }
 
   // ---- wire up --------------------------------------------------------------
