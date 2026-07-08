@@ -21,14 +21,38 @@
   h1 { font-size: 38px; line-height: 1.15; margin: 10px 0 14px; letter-spacing: -.5px; }
   .lede { font-size: 18px; color: var(--muted); margin: 0 0 22px; max-width: 64ch; }
   .cta-row { display: flex; gap: 12px; flex-wrap: wrap; }
-  a.btn {
+  a.btn, button.btn {
     display: inline-block; text-decoration: none; font-weight: 600; font-size: 15px;
     padding: 11px 18px; border-radius: 8px; border: 1px solid var(--border);
-    color: var(--text); background: var(--panel-2);
+    color: var(--text); background: var(--panel-2); font-family: inherit; cursor: pointer;
   }
-  a.btn:hover { border-color: #3c4456; background: #242a35; }
-  a.btn.primary { background: var(--accent-2); border-color: var(--accent); }
-  a.btn.primary:hover { background: var(--accent); }
+  a.btn:hover, button.btn:hover { border-color: #3c4456; background: #242a35; }
+  a.btn.primary, button.btn.primary { background: var(--accent-2); border-color: var(--accent); }
+  a.btn.primary:hover, button.btn.primary:hover { background: var(--accent); }
+
+  .merge-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px; z-index: 100;
+  }
+  .merge-box {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 24px; max-width: 560px; width: 100%; max-height: 80vh; overflow-y: auto;
+  }
+  .merge-box h3 { margin: 0 0 10px; font-size: 20px; }
+  .merge-summary { color: var(--muted); font-size: 14px; margin: 0 0 18px; }
+  .merge-list { display: grid; gap: 12px; margin-bottom: 20px; }
+  .merge-row {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .merge-row-title { font-weight: 600; font-size: 15px; margin-bottom: 2px; }
+  .merge-row-sub { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .merge-row select {
+    width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 8px; font: inherit; font-size: 13px;
+  }
+  .merge-actions { display: flex; justify-content: flex-end; gap: 10px; }
 
   h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 44px 0 16px; font-weight: 600; }
   .shows { display: grid; gap: 12px; }
@@ -210,14 +234,25 @@
   renderLocalDrafts();
 
   // ── Export / import all local drafts as one backup file ────────────────
+  function loadLocalIndex() {
+    try { return JSON.parse(localStorage.getItem('bvp:index') || '[]'); } catch (_) { return []; }
+  }
+  function loadLocalConfig(slug) {
+    try { return JSON.parse(localStorage.getItem('bvp:config:' + slug) || 'null'); } catch (_) { return null; }
+  }
+  function uniqueSlug(base, taken) {
+    let candidate = base + '-imported', n = 2;
+    while (taken.has(candidate)) { candidate = base + '-imported-' + n; n++; }
+    return candidate;
+  }
+
   function exportAllDrafts() {
-    let idx = [];
-    try { idx = JSON.parse(localStorage.getItem('bvp:index') || '[]'); } catch (_) {}
+    const idx = loadLocalIndex();
     if (!idx.length) { alert('No local drafts to export.'); return; }
     const configs = {};
     idx.forEach(e => {
-      const raw = localStorage.getItem('bvp:config:' + e.slug);
-      if (raw) { try { configs[e.slug] = JSON.parse(raw); } catch (_) {} }
+      const cfg = loadLocalConfig(e.slug);
+      if (cfg) configs[e.slug] = cfg;
     });
     const bundle = { type: 'bvp-backup', version: 1, exportedAt: Date.now(), index: idx, configs };
     const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
@@ -229,6 +264,106 @@
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  }
+
+  // Applies a resolved merge: `fresh` entries are added outright, `identical`
+  // entries are left alone (already match), and each item in `resolutions`
+  // (one per conflict) is applied per its chosen action: 'mine' (skip),
+  // 'theirs' (overwrite), or 'both' (add the backup's version under a new slug).
+  function applyMerge({ bundle, fresh, identical, resolutions }) {
+    const bySlug = new Map(loadLocalIndex().map(e => [e.slug, e]));
+    let added = 0, updated = 0, both = 0;
+
+    fresh.forEach(e => {
+      bySlug.set(e.slug, e);
+      localStorage.setItem('bvp:config:' + e.slug, JSON.stringify(bundle.configs[e.slug]));
+      added++;
+    });
+    resolutions.forEach(r => {
+      if (r.action === 'mine') return;
+      if (r.action === 'theirs') {
+        bySlug.set(r.conflict.entry.slug, r.conflict.entry);
+        localStorage.setItem('bvp:config:' + r.conflict.entry.slug, JSON.stringify(r.conflict.theirsConfig));
+        updated++;
+      } else if (r.action === 'both') {
+        const newSlug = uniqueSlug(r.conflict.entry.slug, bySlug);
+        const newEntry = Object.assign({}, r.conflict.entry, {
+          slug: newSlug,
+          title: (r.conflict.entry.title || r.conflict.entry.slug) + ' (imported)',
+        });
+        bySlug.set(newSlug, newEntry);
+        localStorage.setItem('bvp:config:' + newSlug, JSON.stringify(r.conflict.theirsConfig));
+        both++;
+      }
+    });
+
+    localStorage.setItem('bvp:index', JSON.stringify(Array.from(bySlug.values())));
+    renderLocalDrafts();
+    const parts = [];
+    if (added) parts.push(`${added} new`);
+    if (updated) parts.push(`${updated} overwritten`);
+    if (both) parts.push(`${both} kept as separate copies`);
+    if (identical.length) parts.push(`${identical.length} already matched`);
+    alert(parts.length ? `Merge complete: ${parts.join(', ')}.` : 'Nothing to import.');
+  }
+
+  function openMergeModal({ bundle, fresh, identical, conflicts }) {
+    const overlay = document.createElement('div');
+    overlay.className = 'merge-overlay';
+    const box = document.createElement('div');
+    box.className = 'merge-box';
+
+    const bits = [];
+    if (fresh.length) bits.push(`${fresh.length} new draft${fresh.length === 1 ? '' : 's'} will be added`);
+    if (identical.length) bits.push(`${identical.length} already match`);
+    bits.push(`${conflicts.length} ${conflicts.length === 1 ? 'draft has' : 'drafts have'} edits on both sides`);
+
+    box.innerHTML =
+      '<h3>Merge backup</h3>' +
+      `<p class="merge-summary">${bits.join(' · ')}. Choose what to do with each:</p>` +
+      '<div class="merge-list"></div>' +
+      '<div class="merge-actions">' +
+      '<button type="button" class="btn" id="merge-cancel">Cancel</button>' +
+      '<button type="button" class="btn primary" id="merge-apply">Apply merge</button>' +
+      '</div>';
+
+    const list = box.querySelector('.merge-list');
+    conflicts.forEach((c, i) => {
+      const row = document.createElement('div');
+      row.className = 'merge-row';
+      const mineDate = new Date(c.mine.modified).toLocaleString();
+      const theirsDate = new Date(c.entry.modified).toLocaleString();
+      row.innerHTML =
+        `<div class="merge-row-title"></div>` +
+        `<div class="merge-row-sub">Mine: modified ${mineDate} · Backup: modified ${theirsDate}</div>` +
+        `<select data-idx="${i}">` +
+        '<option value="both" selected>Keep both (add backup copy alongside mine)</option>' +
+        '<option value="mine">Keep mine (ignore backup version)</option>' +
+        '<option value="theirs">Keep backup (overwrite mine)</option>' +
+        '</select>';
+      row.querySelector('.merge-row-title').textContent = c.entry.title || c.entry.slug;
+      list.appendChild(row);
+    });
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    function close() {
+      overlay.remove();
+      document.removeEventListener('keydown', onKey);
+    }
+    function onKey(ev) { if (ev.key === 'Escape') close(); }
+    document.addEventListener('keydown', onKey);
+    overlay.addEventListener('click', ev => { if (ev.target === overlay) close(); });
+    box.querySelector('#merge-cancel').addEventListener('click', close);
+    box.querySelector('#merge-apply').addEventListener('click', () => {
+      const resolutions = conflicts.map((c, i) => ({
+        conflict: c,
+        action: list.querySelector(`select[data-idx="${i}"]`).value,
+      }));
+      close();
+      applyMerge({ bundle, fresh, identical, resolutions });
+    });
   }
 
   function importAllDrafts(file) {
@@ -243,19 +378,24 @@
         alert('This file does not look like a Branching Video backup.');
         return;
       }
-      let idx = [];
-      try { idx = JSON.parse(localStorage.getItem('bvp:index') || '[]'); } catch (_) {}
-      const bySlug = new Map(idx.map(e => [e.slug, e]));
-      let imported = 0;
+      const bySlug = new Map(loadLocalIndex().map(e => [e.slug, e]));
+      const fresh = [], identical = [], conflicts = [];
       bundle.index.forEach(e => {
         if (!e || !e.slug || !bundle.configs[e.slug]) return;
-        bySlug.set(e.slug, e);
-        localStorage.setItem('bvp:config:' + e.slug, JSON.stringify(bundle.configs[e.slug]));
-        imported++;
+        const mine = bySlug.get(e.slug);
+        if (!mine) { fresh.push(e); return; }
+        const mineConfig = loadLocalConfig(e.slug);
+        if (JSON.stringify(mineConfig) === JSON.stringify(bundle.configs[e.slug])) {
+          identical.push(e);
+        } else {
+          conflicts.push({ entry: e, mine, theirsConfig: bundle.configs[e.slug] });
+        }
       });
-      localStorage.setItem('bvp:index', JSON.stringify(Array.from(bySlug.values())));
-      alert(`Imported ${imported} draft${imported === 1 ? '' : 's'}. Existing drafts with matching names were overwritten.`);
-      renderLocalDrafts();
+      if (!conflicts.length) {
+        applyMerge({ bundle, fresh, identical, resolutions: [] });
+        return;
+      }
+      openMergeModal({ bundle, fresh, identical, conflicts });
     };
     reader.readAsText(file);
   }
