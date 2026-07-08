@@ -77,6 +77,11 @@
     </header>
 
     <h2>Local drafts</h2>
+    <div class="cta-row" style="margin: -6px 0 16px;">
+      <a class="btn" id="export-all-btn" href="#">Export All ⭳</a>
+      <a class="btn" id="import-all-btn" href="#">Import All ⭱</a>
+      <input type="file" id="import-all-file" accept="application/json" style="display:none" />
+    </div>
     <div class="shows" id="local-shows">
       <div class="empty" id="local-empty" style="display:none">No local drafts yet. Build one in <a href="studio.html">Studio</a>.</div>
     </div>
@@ -203,6 +208,71 @@
   }
 
   renderLocalDrafts();
+
+  // ── Export / import all local drafts as one backup file ────────────────
+  function exportAllDrafts() {
+    let idx = [];
+    try { idx = JSON.parse(localStorage.getItem('bvp:index') || '[]'); } catch (_) {}
+    if (!idx.length) { alert('No local drafts to export.'); return; }
+    const configs = {};
+    idx.forEach(e => {
+      const raw = localStorage.getItem('bvp:config:' + e.slug);
+      if (raw) { try { configs[e.slug] = JSON.parse(raw); } catch (_) {} }
+    });
+    const bundle = { type: 'bvp-backup', version: 1, exportedAt: Date.now(), index: idx, configs };
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `branching-video-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function importAllDrafts(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      let bundle;
+      try { bundle = JSON.parse(reader.result); } catch (_) {
+        alert('Invalid backup file.');
+        return;
+      }
+      if (!bundle || bundle.type !== 'bvp-backup' || !Array.isArray(bundle.index) || !bundle.configs) {
+        alert('This file does not look like a Branching Video backup.');
+        return;
+      }
+      let idx = [];
+      try { idx = JSON.parse(localStorage.getItem('bvp:index') || '[]'); } catch (_) {}
+      const bySlug = new Map(idx.map(e => [e.slug, e]));
+      let imported = 0;
+      bundle.index.forEach(e => {
+        if (!e || !e.slug || !bundle.configs[e.slug]) return;
+        bySlug.set(e.slug, e);
+        localStorage.setItem('bvp:config:' + e.slug, JSON.stringify(bundle.configs[e.slug]));
+        imported++;
+      });
+      localStorage.setItem('bvp:index', JSON.stringify(Array.from(bySlug.values())));
+      alert(`Imported ${imported} draft${imported === 1 ? '' : 's'}. Existing drafts with matching names were overwritten.`);
+      renderLocalDrafts();
+    };
+    reader.readAsText(file);
+  }
+
+  document.getElementById('export-all-btn').addEventListener('click', ev => {
+    ev.preventDefault();
+    exportAllDrafts();
+  });
+  document.getElementById('import-all-btn').addEventListener('click', ev => {
+    ev.preventDefault();
+    document.getElementById('import-all-file').click();
+  });
+  document.getElementById('import-all-file').addEventListener('change', ev => {
+    const file = ev.target.files[0];
+    if (file) importAllDrafts(file);
+    ev.target.value = '';
+  });
 })();
 </script>
 </body>
