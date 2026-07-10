@@ -179,7 +179,7 @@
     header { gap: 6px; padding: 8px 10px; }
     header h1 { font-size: 13px; flex: 1; }
     header .spacer, header .filename, #loadBtn, #newBtn, #configsBtn,
-    #playerBtn, #copyBtn, .menu-wrap { display: none !important; }
+    #playerBtn, #studioBtn, #copyBtn, .menu-wrap { display: none !important; }
     #mobile-menu-btn { display: flex; }
     main { flex-direction: column; }
     .sidebar { display: none; }
@@ -243,6 +243,7 @@
   </div>
   <button id="mobile-menu-btn" aria-label="Open menu">☰</button>
   <button id="playerBtn" title="Opens player.html for the selected node. Uses the config.json saved on disk, not this unsaved draft.">Play current ↗</button>
+  <button id="studioBtn" title="Open this draft in Studio, the timeline-based editor">Open in Studio ✦</button>
   <button id="copyBtn">Copy JSON</button>
   <button id="saveBtn" class="primary">Save As…</button>
 </header>
@@ -967,6 +968,14 @@
   document.getElementById('playerBtn').addEventListener('click', () => {
     const hash = selectedId ? '#' + selectedId : '';
     window.open('player.html' + hash, '_blank');
+  });
+  document.getElementById('studioBtn').addEventListener('click', () => {
+    if (!config.masterVideoId) {
+      alert('Studio works from a single master video. Set "Master video ID" in show settings first.');
+      return;
+    }
+    localStorage.setItem('bvp:transfer', JSON.stringify(serialize()));
+    window.open('studio.html#transfer', '_blank');
   });
 
   // Try to preload the config.json sitting next to this file (works under the dev server).

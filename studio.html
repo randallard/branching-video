@@ -167,6 +167,8 @@
       <input type="number" id="countdownInput" value="8" min="1" max="60" style="width:100px" />
     </div>
     <button class="primary" id="startBtn">Load video →</button>
+    <button id="importBtn" title="Load an exported show config (.json)">Import config JSON…</button>
+    <input type="file" id="importFile" accept=".json,application/json" style="display:none" />
     <div id="setup-err" style="color:#ff8b84;font-size:12px;display:none"></div>
   </div>
 </div>
@@ -334,6 +336,46 @@ document.getElementById('startBtn').addEventListener('click', async () => {
     });
   }
   enterWorkspace();
+});
+
+// Take an existing config object (import / transfer) into the workspace.
+function adoptConfig(cfg) {
+  if (cfg && cfg.type === 'bvp-backup') {
+    showSetupError('That is a full backup file — import it from the home page ("Import All"), then use Resume draft… here.');
+    return false;
+  }
+  if (!cfg || !Array.isArray(cfg.nodes)) {
+    showSetupError('That does not look like a show config (no nodes array).');
+    return false;
+  }
+  if (!cfg.masterVideoId) {
+    showSetupError('Studio needs a config with a masterVideoId (one master video). Use the editor for configs with per-node videos.');
+    return false;
+  }
+  $setupErr.style.display = 'none';
+  config = cfg;
+  enterWorkspace();
+  return true;
+}
+
+function showSetupError(msg) {
+  $setupErr.textContent = msg;
+  $setupErr.style.display = 'block';
+}
+
+document.getElementById('importBtn').addEventListener('click', () => {
+  document.getElementById('importFile').click();
+});
+document.getElementById('importFile').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try { adoptConfig(JSON.parse(reader.result)); }
+    catch (err) { showSetupError('Could not parse JSON: ' + err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
 });
 
 document.getElementById('newBtn').addEventListener('click', () => {
@@ -762,9 +804,16 @@ function serialize() {
   if (config.masterVideoId) out.masterVideoId = config.masterVideoId;
   out.nodes = config.nodes.map(n => {
     const o = { id: n.id, title: n.title || '', choices: [] };
+    // Pass through fields the studio doesn't edit (set via the form editor)
+    if (n.videoId) o.videoId = n.videoId;
     if (typeof n.start === 'number') o.start = n.start;
     if (typeof n.end === 'number') o.end = n.end;
+    if (typeof n.showChoicesAt === 'number') o.showChoicesAt = n.showChoicesAt;
+    if (n.isAside) o.isAside = true;
+    if (n.defaultAside) o.defaultAside = true;
+    if (n.returnAtCurrentTime) o.returnAtCurrentTime = true;
     if (n.returnTo) o.returnTo = n.returnTo;
+    if (n.endScreen) o.endScreen = n.endScreen;
     o.choices = (n.choices || []).map(c => {
       const co = { label: c.label || '', target: c.target || '' };
       if (c.default) co.default = true;
@@ -781,6 +830,16 @@ function serialize() {
   const idx = lsIndex();
   const btn = document.getElementById('resumeBtn');
   if (!idx.length) btn.disabled = true;
+
+  // If another page handed us a config (e.g. editor "Open in Studio"),
+  // consume the transfer key from localStorage — same convention as editor.html.
+  if (location.hash === '#transfer') {
+    history.replaceState(null, '', location.pathname + location.search);
+    try {
+      const raw = localStorage.getItem('bvp:transfer');
+      if (raw && adoptConfig(JSON.parse(raw))) return;
+    } catch (_) {}
+  }
 
   // If index.html sent us a specific draft to resume, load it immediately.
   const resumeSlug = localStorage.getItem('bvp:resume');
