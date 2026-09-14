@@ -1,0 +1,28 @@
+# The mechanical tier of documentation review: index accuracy, valid statuses,
+# resolvable supersession links, working relative links, journal filenames.
+#
+# This one DOES gate — it only ever fires on things that are objectively wrong
+# and cheap to fix. Judgment lives in the monthly stance review, which never
+# blocks (see .github/workflows/stance-review.yml).
+name: docs hygiene
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  hygiene:
+    name: docs hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      # No setup-python step: the script is stdlib-only by design, so it runs on
+      # the runner's system Python in a Rust-only project just as well as a TS one.
+      - run: python3 scripts/docs-hygiene.py

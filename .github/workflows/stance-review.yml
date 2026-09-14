@@ -1,0 +1,72 @@
+# Deliberately calibrated to nag, never block. This workflow only opens and bumps
+# an issue — it cannot fail a build or gate a merge. A review that blocks CI gets
+# disabled the first busy week, and then you have neither the gate nor the habit.
+# Reasoning: docs/reviews/README.md
+name: stance review
+
+on:
+  schedule:
+    - cron: "0 13 1 * *" # 13:00 UTC, 1st of the month
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  remind:
+    name: check review freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: measure days since last recorded review
+        id: age
+        run: |
+          set -euo pipefail
+          latest=$(ls docs/reviews/[0-9]*-stance-review.md 2>/dev/null | sort | tail -1 || true)
+          if [ -z "$latest" ]; then
+            echo "days=9999" >> "$GITHUB_OUTPUT"
+            echo "last=never" >> "$GITHUB_OUTPUT"
+            echo "No review recorded yet."
+          else
+            date=$(basename "$latest" | cut -d- -f1-3)
+            days=$(( ( $(date -u +%s) - $(date -u -d "$date" +%s) ) / 86400 ))
+            echo "days=$days" >> "$GITHUB_OUTPUT"
+            echo "last=$date" >> "$GITHUB_OUTPUT"
+            echo "Last review $date — $days days ago."
+          fi
+
+      - name: open or bump the review issue
+        if: fromJSON(steps.age.outputs.days) >= 30
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DAYS: ${{ steps.age.outputs.days }}
+          LAST: ${{ steps.age.outputs.last }}
+        run: |
+          set -euo pipefail
+          existing=$(gh issue list --label stance-review --state open --json number,updatedAt --jq '.[0] // empty')
+
+          if [ -z "$existing" ]; then
+            gh label create stance-review \
+              --description "Monthly re-examination of standing decisions" \
+              --color 0E8A16 2>/dev/null || true
+            { echo "Last recorded review: **$LAST** (${DAYS} days ago)."; echo; \
+              cat .github/stance-review-issue.md; } > /tmp/body.md
+            gh issue create --title "Stance review due (last: $LAST)" \
+              --label stance-review --body-file /tmp/body.md
+            echo "Opened a new stance-review issue."
+          else
+            number=$(echo "$existing" | jq -r .number)
+            updated=$(echo "$existing" | jq -r .updatedAt)
+            idle=$(( ( $(date -u +%s) - $(date -u -d "$updated" +%s) ) / 86400 ))
+            if [ "$idle" -ge 7 ]; then
+              gh issue comment "$number" --body \
+                "Still open — outstanding **${DAYS} days** since ${LAST}. No rush, but worth either doing it or recording a deferral."
+              echo "Bumped issue #$number (idle ${idle}d)."
+            else
+              echo "Issue #$number open and active (${idle}d idle) — not bumping."
+            fi
+          fi

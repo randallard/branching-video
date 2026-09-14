@@ -1,5 +1,5 @@
 # ADR-0002: Import conflict resolution — per-draft keep-mine/keep-theirs/keep-both, only when content actually differs
-- Status: Accepted
+- Status: Superseded by [ADR-0008](0008-edit-level-events-per-field-last-writer-wins.md)
 - Date: 2026-07-08
 - Deciders: Ryan
 

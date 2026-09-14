@@ -1,0 +1,31 @@
+# Paths that change what the build does, or what a Claude session does — both
+# deserve review even when the diff looks like prose.
+#
+# Defaults to @randallard, so projects scaffolded from this template are correct
+# without editing. **If you are not randallard, change every handle below or
+# delete this file** — a CODEOWNERS pointing at someone with no access to your
+# repo looks like a control and silently isn't.
+#
+# CODEOWNERS by itself only *requests* a reviewer. To make it a gate, enable
+# branch protection on main: "Require a pull request before merging" plus
+# "Require review from Code Owners". See
+# .claude/skills/project-conventions/SKILL.md.
+
+# Instructions the model follows. These read like documentation and change
+# behaviour like configuration — the combination is why they're listed first.
+/.claude/            @randallard
+/CLAUDE.md           @randallard
+
+# CI: what runs, with what permissions, pinned to which action SHAs.
+/.github/            @randallard
+
+# Supply-chain posture. Changes here should cite the ADR that decided them.
+/.npmrc              @randallard
+/pnpm-workspace.yaml @randallard
+/renovate.json       @randallard
+/deny.toml           @randallard
+/Cargo.lock          @randallard
+/pnpm-lock.yaml      @randallard
+
+# Decisions and their conventions.
+/docs/adr/           @randallard

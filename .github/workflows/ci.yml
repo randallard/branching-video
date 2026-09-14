@@ -1,0 +1,202 @@
+# One workflow, both language paths. `detect` looks for Cargo.toml / package.json
+# and the language jobs skip themselves when their manifest isn't there — so a
+# TS-only or Rust-only project needs no edits, and a project that grows a second
+# language needs none either.
+#
+# EVERY third-party action is pinned to a full-length commit SHA, not a tag.
+# Tags are mutable: the tj-actions/changed-files compromise (CVE-2025-30066)
+# worked by repointing existing version tags at a malicious commit, and GitHub's
+# own guidance calls a SHA "the only way to use an action as an immutable
+# release". The trailing comment records the human-readable version — keep it
+# accurate when you bump, since the SHA alone tells you nothing.
+#
+# Note dtolnay/rust-toolchain@stable is a *branch*, which moves by design — the
+# pin matters most there.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    name: detect languages
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.d.outputs.rust }}
+      ts: ${{ steps.d.outputs.ts }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - id: d
+        run: |
+          set -euo pipefail
+          rust=false; ts=false
+          [ -f Cargo.toml ] && rust=true
+          [ -f package.json ] && ts=true
+          echo "rust=$rust" >> "$GITHUB_OUTPUT"
+          echo "ts=$ts" >> "$GITHUB_OUTPUT"
+          echo "rust=$rust ts=$ts"
+
+  # ── Rust ────────────────────────────────────────────────────────────────────
+  rust-gates:
+    name: rust fast gates
+    needs: detect
+    if: needs.detect.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable (branch!)
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - name: fmt
+        run: cargo fmt --all --check
+      - name: clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: test
+        run: cargo test --all-features
+
+  rust-proofs:
+    name: rust proofs (kani)
+    needs: detect
+    if: needs.detect.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    # Deliberately its own job: a slow or cranky proof run must never delay the
+    # fast-gate feedback loop, and a separate check name says at a glance which
+    # tier failed. Runs on every push — no paths filter, no schedule.
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - uses: model-checking/kani-github-action@f838096619a707b0f6b2118cf435eaccfa33e51f # v1.1
+        with:
+          # Point this at the pure core crate. Kani needs zero annotations to
+          # give you panic-freedom, so this earns its place from day one.
+          args: --workspace
+
+  rust-supply-chain:
+    name: rust supply chain
+    needs: detect
+    if: needs.detect.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
+        with:
+          command: check licenses bans sources advisories
+
+  # ── TypeScript ──────────────────────────────────────────────────────────────
+  ts-gates:
+    name: ts fast gates
+    needs: detect
+    if: needs.detect.outputs.ts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        if: vars.DEPLOY_PAGES == 'true'
+        with:
+          path: dist
+
+  ts-supply-chain:
+    name: ts supply chain
+    needs: detect
+    if: needs.detect.outputs.ts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: known-vulnerability audit
+        run: pnpm audit --audit-level=high
+      - name: signatures + provenance
+        # A different question from the audit above: that one asks "is this
+        # version on a known-bad list", this asks "was this tarball actually
+        # published by who the registry says, and built where it claims".
+        run: pnpm audit signatures
+      - name: license allowlist
+        run: >
+          pnpm exec license-checker-rseidelsohn
+          --onlyAllow "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD;CC0-1.0;Python-2.0;BlueOak-1.0.0;MPL-2.0;CC-BY-3.0"
+          --excludePrivatePackages
+
+  # ── Shared ──────────────────────────────────────────────────────────────────
+  sbom:
+    name: SBOM
+    needs: detect
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      # Syft scans the project directly — a single static binary, no npm or cargo
+      # dependency of its own, so it sidesteps package-manager layout problems.
+      - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom.cdx.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: sbom
+          path: sbom.cdx.json
+
+  osv-scan:
+    name: OSV scan
+    needs: detect
+    # Only when there's a dependency manifest to scan. Without this the template
+    # repo itself — which has no Cargo.toml or package.json — goes red on a scan
+    # of nothing, and a template whose own CI is failing teaches the wrong thing.
+    if: needs.detect.outputs.rust == 'true' || needs.detect.outputs.ts == 'true'
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    # Reusable workflow — pinned by tag because `uses:` on a reusable workflow
+    # resolves a ref in that repo the same way; bump deliberately.
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
+
+  deploy:
+    name: deploy to Pages
+    needs: [ts-gates, ts-supply-chain]
+    # Opt in per project: Settings → Variables → DEPLOY_PAGES = true.
+    # Remember `base` must match the repo name or every asset 404s.
+    if: vars.DEPLOY_PAGES == 'true' && github.ref == 'refs/heads/main'
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5

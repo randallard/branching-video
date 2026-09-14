@@ -1,5 +1,5 @@
 # ADR-0001: Bulk backup as a single JSON bundle, merge-by-slug on import
-- Status: Superseded by ADR-0002 (import's overwrite-on-collision behavior only; the single-JSON-bundle format below is unchanged)
+- Status: Superseded by [ADR-0002](0002-import-conflict-resolution-per-draft-choice.md) (import overwrite behaviour) and [ADR-0007](0007-indexeddb-append-only-event-log-storage.md) (bundle format)
 - Date: 2026-07-08
 - Deciders: Ryan
 
