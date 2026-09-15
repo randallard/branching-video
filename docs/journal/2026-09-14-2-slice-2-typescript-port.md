@@ -70,3 +70,25 @@ CDP script (scratchpad, not committed) driving the built site on a spare port: 1
 all pages, including importing the real ukulele file into Studio and a legacy backup through the
 merge modal. The preview/dev servers were stopped afterwards; Ryan's dev server was not touched.
 Not checked: anything that needs YouTube to actually play.
+
+## Later: ADR-0020 accepted
+
+Ryan pointed out the repository has no forks. That removes one of 0020's two reasons, not the
+decision: the dev-URL change alone justifies `base: "./"`. While 0020 was still Proposed its
+Context was reworded to say so — dev URLs are the reason, forks only a possible future benefit —
+and then it was accepted, flipping ADR-0005 to superseded. ADR-0021 is still Proposed.
+
+## Later still: 0021 accepted, ADR-0022, pushed before the browser pass
+
+Ryan accepted ADR-0021 and answered the ukulele question: no-choice nodes should just continue
+with the video. That is a behaviour change, so it became ADR-0022 rather than a quiet tweak to the
+port. The rule went into `src/core/routing.ts` instead of `player.ts` so it could be tested and
+shared: the validator used to call every node of the ukulele show a dead end *and* flag most of
+them unreachable, and both warnings were really the same missing edge. Now it follows the continue
+edge and only warns about a last node that would show "Watch again". The published Cardistry
+tutorial changes with it — its steps no longer pause after each one.
+
+He also asked for a README warning that breaking changes can happen at any time (no one has been
+given this yet), with an invitation to say so if you want to use it — the trigger for switching to
+non-breaking development. And he chose to commit and push slice 2 now and do the browser pass
+later, so PROGRESS lists what is still unverified rather than calling slice 2 done.

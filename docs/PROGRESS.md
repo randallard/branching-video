@@ -13,7 +13,7 @@ https://randallard.github.io/branching-video/.
 **Slice 1 of 4 is committed** on `adopt-template` as `981add8` (not pushed): conventions,
 CI, licence, ADRs 0003–0019 (0008, 0009, 0011 accepted by Ryan; ADR-0002 superseded).
 
-**Slice 2 of 4 is written and uncommitted, pending Ryan's local verification** — the Vite +
+**Slice 2 of 4 is committed but not yet browser-verified** (Ryan chose to push and test later) — the Vite +
 strict-TypeScript build with every page ported behaviour-for-behaviour, still on `localStorage`.
 What's verified (2026-09-14): `pnpm lint` (zero warnings), `pnpm test` (25 tests incl. fast-check
 properties), `pnpm build`, `pnpm audit` (clean), `pnpm audit signatures` (285 verified), the
@@ -25,12 +25,18 @@ title/menu/missing-config, Import All merge modal + keep-both) — all passing.
 choice countdown, asides/back-to-branch, Studio marking against a playing video, the Editor's
 mobile drawer and Chromium Save As. See [journal 2026-09-14-2](journal/2026-09-14-2-slice-2-typescript-port.md).
 
+**Also in slice 2, by Ryan's decisions (2026-09-14):** ADR-0020 (relative base) and ADR-0021
+(generated manifest) accepted; **ADR-0022** — a node with no choices (and no aside `returnTo` or
+`endScreen`) now plays on into the next node in order, so the ukulele and Cardistry shows play
+straight through; README carries an "early development — breaking changes at any time" warning
+(no one has been handed this yet; switch to non-breaking development if someone asks to use it).
+
 **Next:**
 1. Ryan: `pnpm install`, restart the dev server as `pnpm dev` (still `0.0.0.0:8080`), click
-   through the unverified list above.
-2. Ryan decides **Proposed ADR-0020** (relative `base: "./"` and `appType: "mpa"`, superseding
-   ADR-0005's `/branching-video/` base) and **ADR-0021** (manifest generated, not committed).
-3. Commit slice 2; start slice 3 (pure core + IndexedDB event log).
+   through the unverified list above — now including a no-choice show playing through (load the
+   ukulele file in Studio → Play ▶).
+2. Start slice 3 (event-log core, IndexedDB, `localStorage` migration).
+3. Cutover to Actions-deployed Pages (ADR-0006) whenever Ryan wants the branch live.
 
 **Why this started:** Ryan wanted to load previously exported single-show configs (e.g.
 `most-useful-music-theory-for-ukulele 3.json`). Today: home-page **Import All** rejects them
@@ -44,7 +50,8 @@ draft with the same title exists (or rename/export the existing one first).
 Target state, decided 2026-09-14. Links rather than restatement:
 
 - Rigor tier: provable-lite, strict TS, pure core + fast-check — [ADR-0004](adr/0004-provable-lite-strict-typescript-and-property-tests.md)
-- Build: Vite multi-page, page URLs unchanged, runtime-fetched JSON in `public/` — [ADR-0005](adr/0005-vite-multi-page-build-replaces-no-build-html.md), relative base proposed in [0020](adr/0020-vite-multi-page-build-with-relative-base.md); manifest generated — [0021](adr/0021-generate-show-manifest-at-build.md) (proposed)
+- Build: Vite multi-page, page URLs unchanged, runtime-fetched JSON in `public/` — [ADR-0005](adr/0005-vite-multi-page-build-replaces-no-build-html.md), superseded by [0020](adr/0020-vite-multi-page-build-with-relative-base.md) (relative base); manifest generated — [0021](adr/0021-generate-show-manifest-at-build.md)
+- Routing: no-choice nodes continue to the next node — [ADR-0022](adr/0022-no-choice-nodes-continue-to-next-node.md)
 - Hosting: Pages from the CI artifact (`DEPLOY_PAGES`) — [ADR-0006](adr/0006-pages-deploy-from-ci-build-artifact.md)
 - Storage: IndexedDB append-only event log, event-bundle backups — [ADR-0007](adr/0007-indexeddb-append-only-event-log-storage.md); event model [0008](adr/0008-edit-level-events-per-field-last-writer-wins.md), identity [0009](adr/0009-show-identity-by-generated-id-not-slug.md), legacy import [0011](adr/0011-legacy-drafts-and-backups-import-as-snapshot-events.md)
 - Show file format unchanged (player, `live/`, and cycle-in depend on it) — [ADR-0010](adr/0010-config-json-stays-the-publish-and-interchange-format.md)
@@ -68,19 +75,21 @@ Property tests (`fast-check`) on `src/core/`, run by `pnpm test`:
 - Legacy backup import classification partitions every importable entry into exactly one of
   fresh / identical / conflict, and a machine importing its own backup gets no fresh or conflicts.
 - Manifest build/parse round-trips.
+- Segment-end routing: `continue` only ever targets the immediately following node and never
+  fires from the last node; choices show exactly when a node has them; the validator's
+  continue rule agrees with the player's.
 
-Not yet: the event log reducer, import idempotence, and routing properties — slice 3 (ADR-0004).
+Not yet: the event log reducer and import idempotence — slice 3 (ADR-0004).
 
 ## Worklist
 
 1. **Slice 1 — conventions, CI, ADRs.** Done, committed on the branch.
-2. **Slice 2 — build + typed pages.** Written and checked as above; uncommitted pending Ryan's
-   browser pass and ADRs 0020/0021. Layout: `src/core` (config model, text helpers, validate,
+2. **Slice 2 — build + typed pages.** Committed; browser pass still owed. Layout: `src/core` (config model, text helpers, validate,
    serializers, manifest, legacy backup), `src/shell` (youtube, drafts, files, shows), `src/ui/dom.ts`,
    `src/pages/*.ts`; `tools/validate-config.ts` runs under Node type stripping.
 3. **Slice 3 — event-log core.** Events (ADR-0008), show ids (0009), reducer, event bundle,
    snapshot import with content-hash ids (0011), IndexedDB store, one-time `localStorage`
-   migration; routing decisions pulled out of `player.ts` into the core; unify the Studio and
+   migration; unify the Studio and
    Editor serializers (they differ today, preserved deliberately in slice 2).
 4. **Slice 4 — the feature.** Single-show config import through Import All (multi-file) and
    Studio, per ADR-0011. Then retest with the ukulele file.
@@ -91,10 +100,6 @@ Not yet: the event log reducer, import idempotence, and routing properties — s
 Found in slice 2, not yet scheduled:
 - **Editor marks a freshly loaded file as unsaved** (`loadConfig` → `structural()` sets `dirty`),
   so leaving the Editor prompts even with no edits. Pre-existing; kept in the port, commented.
-- **The ukulele show is eleven dead ends** (`pnpm validate` on it): no node has choices, so every
-  segment ends on "That's a wrap / Watch again" rather than playing on. Either the show needs
-  default "Continue" choices, or the single-choice/auto-advance idea below should also cover
-  "no choices → next node in order". Worth deciding before slice 4's retest.
 - No favicon (404 on every page).
 
 Carried over, not yet scheduled (from `notes.txt`):
@@ -138,3 +143,6 @@ and [`reviews/`](reviews/README.md) for stance reviews._
   The pnpm trust gate refused `@types/node@22` (a provenance downgrade in `undici-types@6.21.0`),
   and `vitest@4.1.8` carried a moderate advisory (moved to 4.1.11). See
   [journal 2026-09-14-2](journal/2026-09-14-2-slice-2-typescript-port.md).
+- **2026-09-14 (3)** — Ryan accepted ADR-0020/0021, decided no-choice nodes continue (ADR-0022,
+  implemented in `src/core/routing.ts`), asked for the breaking-changes README warning, and chose
+  to commit and push slice 2 before the browser pass.

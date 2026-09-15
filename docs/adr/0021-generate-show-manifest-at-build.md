@@ -1,7 +1,7 @@
 # ADR-0021: Generate live/manifest.json from public/live in dev and at build
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-14
-- Deciders: Ryan (pending — implemented in slice 2 for review)
+- Deciders: Ryan
 
 ## Context
 The home page and Editor's Configs menu list published shows. They used to prefer `serve`'s HTML

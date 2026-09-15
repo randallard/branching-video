@@ -7,6 +7,8 @@
  */
 import { isRecord } from "./config.ts";
 import type { JsonRecord } from "./config.ts";
+import { continuesToNext } from "./routing.ts";
+import type { RouteShape } from "./routing.ts";
 
 export interface ValidationResult {
   errors: string[];
@@ -34,6 +36,16 @@ const show = (v: unknown): string =>
 
 function asRecords(v: unknown): JsonRecord[] {
   return Array.isArray(v) ? v.map((x) => (isRecord(x) ? x : {})) : [];
+}
+
+function shapeOf(n: JsonRecord): RouteShape {
+  const returnTo = n["returnTo"];
+  return {
+    hasChoices: asRecords(n["choices"]).length > 0,
+    isAside: truthy(n["isAside"]),
+    returnTo: truthy(returnTo) ? show(returnTo) : "",
+    hasEndScreen: truthy(n["endScreen"]),
+  };
 }
 
 function linksOf(n: JsonRecord): JsonRecord[] | null {
@@ -181,6 +193,9 @@ export function validate(rawConfig: unknown): ValidationResult {
       for (const link of linksOf(n) ?? []) {
         if (has(link["target"])) queue.push(key(link["target"]));
       }
+      // A node with no way forward plays on into the next node in order (ADR-0022).
+      const next = nodes[nodes.indexOf(n) + 1];
+      if (next && continuesToNext(shapeOf(n)) && has(next["id"])) queue.push(key(next["id"]));
     }
     for (const n of nodes) {
       const idStr = show(n["id"]);
@@ -190,11 +205,10 @@ export function validate(rawConfig: unknown): ValidationResult {
     }
   }
 
-  for (const n of nodes) {
-    const hasChoices = asRecords(n["choices"]).length > 0;
-    if (!hasChoices && !truthy(n["returnTo"]) && !truthy(n["endScreen"])) {
-      warn(`node "${show(n["id"])}" is a dead end (no choices, no returnTo, no endScreen) — viewer will see generic "Watch again" screen`);
-    }
+  // Only the last node can dead-end now: earlier ones continue into the next node (ADR-0022).
+  const last = nodes[nodes.length - 1];
+  if (last && continuesToNext(shapeOf(last))) {
+    warn(`node "${show(last["id"])}" is the last node and has no choices, aside returnTo, or endScreen — viewer will see generic "Watch again" screen`);
   }
 
   return { errors, warnings, nodeCount: nodes.length, uniqueIds: seenIds.size };

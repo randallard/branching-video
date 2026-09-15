@@ -1,5 +1,5 @@
 # ADR-0005: Vite multi-page build replaces the no-build static HTML
-- Status: Accepted
+- Status: Superseded by [ADR-0020](0020-vite-multi-page-build-with-relative-base.md)
 - Date: 2026-09-14
 - Deciders: Ryan
 

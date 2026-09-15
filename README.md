@@ -1,5 +1,10 @@
 # Branching Video Player
 
+> **⚠️ Early development — breaking changes can happen at any time.** Config formats, storage,
+> URLs and behaviour may change without notice or migration while this is being built. Not yet
+> handed out to anyone. **If you're excited to use this, let me know** (open an issue) and
+> development will switch to a mode that doesn't introduce breaking changes.
+
 A lightweight, self-hosted interactive video player that supports non-linear storytelling — deep dives, asides, and viewer-controlled paths — built on YouTube's free infrastructure.
 
 No monthly platform fees. No vendor lock-in. Just a JSON config, a single HTML file, and free static hosting.
@@ -174,7 +179,7 @@ You can mix the two freely: main-line nodes pull from the master video; deep div
 | `start` | — | Seconds into the source video to begin this segment |
 | `end` | — | Seconds into the source video to end this segment. YouTube stops here and fires the choice flow. |
 | `showChoicesAt` | — | Seconds into the source video at which to reveal choices *mid-segment*. Video keeps playing; countdown runs until `end`. |
-| `choices` | ✅ | Array of choice objects (can be empty if `returnTo` or `endScreen` handles routing) |
+| `choices` | ✅ | Array of choice objects. If empty, the segment plays on into the **next node in the list** when it ends — unless it's an aside with `returnTo`, or has an `endScreen`. The last node with no choices shows a generic "Watch again" screen. |
 | `isAside` | — | Marks this node as an aside (affects badge/styling) |
 | `returnTo` | — | Node to auto-route to when this segment ends (no choice needed) |
 | `defaultAside` | — | If `true`, shows a persistent "Skip → back to main" button (requires `returnTo`) |

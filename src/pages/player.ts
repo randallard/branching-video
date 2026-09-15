@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────
 import { normalizeConfig } from "../core/config.ts";
 import type { EndScreen, ShowConfig, ShowNode } from "../core/config.ts";
+import { segmentEndAction } from "../core/routing.ts";
 import { escapeHtml } from "../core/text.ts";
 import { getTransfer } from "../shell/drafts.ts";
 import { errorMessage } from "../shell/files.ts";
@@ -309,41 +310,34 @@ function navigateTo(nodeId: string, seekToOverride?: number): void {
 
 function onSegmentEnded(): void {
   const node = currentNode;
-  if (!node) return;
+  if (!node || !config) return;
 
   // If mid-segment choices are already visible, the countdown owns the next step.
   if ($choices.classList.contains("visible")) return;
 
-  const noChoices = node.choices.length === 0;
-
-  // Resume at the original branch point if this aside opted in and we captured one.
-  if (node.returnAtCurrentTime && branchContext && noChoices) {
-    const ctx = branchContext;
-    branchContext = null;
-    navigateTo(ctx.nodeId, ctx.currentTime);
-    return;
+  const action = segmentEndAction(config, node, branchContext !== null);
+  switch (action.kind) {
+    case "resume-branch": {
+      // Resume at the original branch point this aside opted into.
+      const ctx = branchContext;
+      branchContext = null;
+      if (ctx) navigateTo(ctx.nodeId, ctx.currentTime);
+      return;
+    }
+    case "return-to": // Aside with returnTo: auto-route back to the main line
+    case "continue": // No way forward: play on into the next node (ADR-0022)
+      navigateTo(action.nodeId);
+      return;
+    case "end-screen":
+      showEndScreen(action.endScreen);
+      return;
+    case "wrap": // Last node without an end screen: a simple replay
+      showEndScreen({ heading: "That's a wrap.", links: [{ label: "Watch again", target: node.id }] });
+      return;
+    case "choices":
+      showChoices(node);
+      return;
   }
-
-  // Aside with returnTo: auto-route back to main line
-  if (node.isAside && node.returnTo && noChoices) {
-    navigateTo(node.returnTo);
-    return;
-  }
-
-  // Terminal node with endScreen
-  if (noChoices && node.endScreen) {
-    showEndScreen(node.endScreen);
-    return;
-  }
-
-  // Terminal node without endScreen: show a simple replay
-  if (noChoices) {
-    showEndScreen({ heading: "That's a wrap.", links: [{ label: "Watch again", target: node.id }] });
-    return;
-  }
-
-  // End-of-segment choices
-  showChoices(node);
 }
 
 // ── Choice UI ─────────────────────────────────
