@@ -83,7 +83,7 @@ Copy [`TEMPLATE.md`](TEMPLATE.md).
 | [0002](0002-import-conflict-resolution-per-draft-choice.md) | Import conflict resolution — per-draft keep-mine/keep-theirs/keep-both | Superseded by 0008 |
 | [0003](0003-retrofit-cr-ci-cd-template-onto-existing-repo.md) | Retrofit the cr-ci-cd-rust-typescript-template conventions onto this repo | Accepted |
 | [0004](0004-provable-lite-strict-typescript-and-property-tests.md) | Provable-lite — strict TypeScript, pure core, fast-check; no Rust | Accepted |
-| [0005](0005-vite-multi-page-build-replaces-no-build-html.md) | Vite multi-page build replaces the no-build static HTML | Accepted |
+| [0005](0005-vite-multi-page-build-replaces-no-build-html.md) | Vite multi-page build replaces the no-build static HTML | Accepted (superseded by 0020 if accepted) |
 | [0006](0006-pages-deploy-from-ci-build-artifact.md) | GitHub Pages deploys the CI build artifact, not the branch root | Accepted |
 | [0007](0007-indexeddb-append-only-event-log-storage.md) | Drafts live in an IndexedDB append-only event log; backups are event bundles | Accepted |
 | [0008](0008-edit-level-events-per-field-last-writer-wins.md) | Edit-level events, resolved per field by last writer | Accepted |
@@ -98,3 +98,5 @@ Copy [`TEMPLATE.md`](TEMPLATE.md).
 | [0017](0017-license-allowlist.md) | Enforce a dependency licence allowlist in CI | Accepted |
 | [0018](0018-pin-actions-to-commit-shas.md) | Pin every GitHub Action to a full commit SHA | Accepted |
 | [0019](0019-dual-mit-apache-license.md) | License the project MIT OR Apache-2.0 | Accepted |
+| [0020](0020-vite-multi-page-build-with-relative-base.md) | Vite multi-page build with a relative asset base | Proposed |
+| [0021](0021-generate-show-manifest-at-build.md) | Generate live/manifest.json from public/live in dev and at build | Proposed |

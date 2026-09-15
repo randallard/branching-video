@@ -10,12 +10,27 @@ _Last updated: 2026-09-14_
 inline JS, drafts in `localStorage`) that GitHub Pages serves from the branch root at
 https://randallard.github.io/branching-video/.
 
-**Slice 1 of 4 is committed** on `adopt-template` (not pushed): conventions skill +
-stance-review skill, `CLAUDE.md`, template CI workflows, CODEOWNERS, `scripts/docs-hygiene.py`,
-dual licence, the `template` remote, ADRs 0003–0019 (all Accepted — Ryan accepted 0008, 0009
-and 0011 on 2026-09-14, so ADR-0002 is now superseded), the journal filename fix.
+**Slice 1 of 4 is committed** on `adopt-template` as `981add8` (not pushed): conventions,
+CI, licence, ADRs 0003–0019 (0008, 0009, 0011 accepted by Ryan; ADR-0002 superseded).
 
-**Now:** slice 2 — build + typed pages, no behaviour change (see Worklist).
+**Slice 2 of 4 is written and uncommitted, pending Ryan's local verification** — the Vite +
+strict-TypeScript build with every page ported behaviour-for-behaviour, still on `localStorage`.
+What's verified (2026-09-14): `pnpm lint` (zero warnings), `pnpm test` (25 tests incl. fast-check
+properties), `pnpm build`, `pnpm audit` (clean), `pnpm audit signatures` (285 verified), the
+licence allowlist, OSV-Scanner container on a clean export (no issues), `pnpm validate`, and a
+16-check headless-Chromium smoke test of the built site and the dev server (home page shows +
+legacy drafts, Studio resume and ukulele import, Editor load/validation/Configs menu, Player
+title/menu/missing-config, Import All merge modal + keep-both) — all passing.
+**Not verified — needs Ryan in a real browser:** actual YouTube playback, segment transitions,
+choice countdown, asides/back-to-branch, Studio marking against a playing video, the Editor's
+mobile drawer and Chromium Save As. See [journal 2026-09-14-2](journal/2026-09-14-2-slice-2-typescript-port.md).
+
+**Next:**
+1. Ryan: `pnpm install`, restart the dev server as `pnpm dev` (still `0.0.0.0:8080`), click
+   through the unverified list above.
+2. Ryan decides **Proposed ADR-0020** (relative `base: "./"` and `appType: "mpa"`, superseding
+   ADR-0005's `/branching-video/` base) and **ADR-0021** (manifest generated, not committed).
+3. Commit slice 2; start slice 3 (pure core + IndexedDB event log).
 
 **Why this started:** Ryan wanted to load previously exported single-show configs (e.g.
 `most-useful-music-theory-for-ukulele 3.json`). Today: home-page **Import All** rejects them
@@ -29,7 +44,7 @@ draft with the same title exists (or rename/export the existing one first).
 Target state, decided 2026-09-14. Links rather than restatement:
 
 - Rigor tier: provable-lite, strict TS, pure core + fast-check — [ADR-0004](adr/0004-provable-lite-strict-typescript-and-property-tests.md)
-- Build: Vite multi-page, page URLs unchanged, runtime-fetched JSON in `public/` — [ADR-0005](adr/0005-vite-multi-page-build-replaces-no-build-html.md)
+- Build: Vite multi-page, page URLs unchanged, runtime-fetched JSON in `public/` — [ADR-0005](adr/0005-vite-multi-page-build-replaces-no-build-html.md), relative base proposed in [0020](adr/0020-vite-multi-page-build-with-relative-base.md); manifest generated — [0021](adr/0021-generate-show-manifest-at-build.md) (proposed)
 - Hosting: Pages from the CI artifact (`DEPLOY_PAGES`) — [ADR-0006](adr/0006-pages-deploy-from-ci-build-artifact.md)
 - Storage: IndexedDB append-only event log, event-bundle backups — [ADR-0007](adr/0007-indexeddb-append-only-event-log-storage.md); event model [0008](adr/0008-edit-level-events-per-field-last-writer-wins.md), identity [0009](adr/0009-show-identity-by-generated-id-not-slug.md), legacy import [0011](adr/0011-legacy-drafts-and-backups-import-as-snapshot-events.md)
 - Show file format unchanged (player, `live/`, and cycle-in depend on it) — [ADR-0010](adr/0010-config-json-stays-the-publish-and-interchange-format.md)
@@ -41,31 +56,46 @@ Reference implementation for the event log, IndexedDB store and bundle format:
 
 ## Provability
 
-Nothing is verified yet — there is no TypeScript and no test. Planned properties (ADR-0004):
-reducer is permutation- and duplication-invariant; importing a file twice is a no-op; import
-never removes an existing show; export→import round-trips a show; routing from any node of a
-valid config reaches a defined node or end screen.
+Property tests (`fast-check`) on `src/core/`, run by `pnpm test`:
+
+- `slugify` always yields `[a-z0-9]+(-[a-z0-9]+)*` and is idempotent; `uniqueId` / `importedSlug`
+  never return a taken id.
+- `extractVideoId` recovers any 11-character id from every supported URL shape.
+- `normalizeConfig` and `validate` never throw on arbitrary JSON; any well-formed linear chain of
+  1–30 nodes validates with zero errors and warnings; every dangling choice target is reported.
+- Both serializers are stable (`serialize ∘ normalize ∘ serialize = serialize`), emit no `_` or
+  undefined keys, and round-trip the real ukulele export exactly.
+- Legacy backup import classification partitions every importable entry into exactly one of
+  fresh / identical / conflict, and a machine importing its own backup gets no fresh or conflicts.
+- Manifest build/parse round-trips.
+
+Not yet: the event log reducer, import idempotence, and routing properties — slice 3 (ADR-0004).
 
 ## Worklist
 
 1. **Slice 1 — conventions, CI, ADRs.** Done, committed on the branch.
-2. **Slice 2 — build + typed pages, no behaviour change.** `package.json` (exact versions, pnpm
-   11, `license`, `lint`/`test`/`build` scripts, drop `serve`), `.npmrc`, `pnpm-workspace.yaml`,
-   `renovate.json`, `tsconfig.json`, `eslint.config.js`, `vite.config.ts` (multi-page,
-   `base: "/branching-video/"`). Move `live/`, `config.json`, `config.example.json` to
-   `public/`; switch show discovery to `live/manifest.json` only (Vite dev has no directory
-   listing) and regenerate it in `pnpm build`. Port each page's inline script to `src/`
-   behaviour-for-behaviour; still `localStorage`. Verify every page by running it (Ryan
-   controls the dev server — `pnpm dev` replaces `serve`), plus `pnpm lint/test/build`, the
-   supply-chain commands, and the OSV container.
-3. **Slice 3 — pure core.** Config parse/serialize/validate (replacing
-   `tools/validate-core.js`), routing, events, reducer, bundle, import; IndexedDB store; the
-   one-time `localStorage` migration. fast-check properties above.
+2. **Slice 2 — build + typed pages.** Written and checked as above; uncommitted pending Ryan's
+   browser pass and ADRs 0020/0021. Layout: `src/core` (config model, text helpers, validate,
+   serializers, manifest, legacy backup), `src/shell` (youtube, drafts, files, shows), `src/ui/dom.ts`,
+   `src/pages/*.ts`; `tools/validate-config.ts` runs under Node type stripping.
+3. **Slice 3 — event-log core.** Events (ADR-0008), show ids (0009), reducer, event bundle,
+   snapshot import with content-hash ids (0011), IndexedDB store, one-time `localStorage`
+   migration; routing decisions pulled out of `player.ts` into the core; unify the Studio and
+   Editor serializers (they differ today, preserved deliberately in slice 2).
 4. **Slice 4 — the feature.** Single-show config import through Import All (multi-file) and
    Studio, per ADR-0011. Then retest with the ukulele file.
 5. **Cutover** (ADR-0006, ordered, on the live site): merge to `main`, set `DEPLOY_PAGES=true`,
    switch Pages source to GitHub Actions, check a `player.html?config=…#node` link. Rewrite
    `README.md` and `create.html` deploy instructions in the same change.
+
+Found in slice 2, not yet scheduled:
+- **Editor marks a freshly loaded file as unsaved** (`loadConfig` → `structural()` sets `dirty`),
+  so leaving the Editor prompts even with no edits. Pre-existing; kept in the port, commented.
+- **The ukulele show is eleven dead ends** (`pnpm validate` on it): no node has choices, so every
+  segment ends on "That's a wrap / Watch again" rather than playing on. Either the show needs
+  default "Continue" choices, or the single-choice/auto-advance idea below should also cover
+  "no choices → next node in order". Worth deciding before slice 4's retest.
+- No favicon (404 on every page).
 
 Carried over, not yet scheduled (from `notes.txt`):
 - Single-choice default nodes should auto-advance with no choice UI or 8s countdown (scoped
@@ -80,7 +110,6 @@ Carried over, not yet scheduled (from `notes.txt`):
 
 - Same-field edits on two devices resolve to the later clock under ADR-0008; the losing value
   stays in the log but there's no history view to recover it. Build one, or accept?
-- Should `pnpm manifest` run inside `pnpm build`, or stay a manual step?
 - Retired with ADR-0002 (superseded by 0008), kept for the record: the `-imported` copy
   accumulation and `JSON.stringify` conflict detection.
 
@@ -104,3 +133,8 @@ and [`reviews/`](reviews/README.md) for stance reviews._
 - **2026-09-14** — Audited against the template; Ryan chose full migration, IndexedDB event log,
   Actions deploy, branch-in-slices. Slice 1 written. See
   [journal 2026-09-14-1](journal/2026-09-14-1-adopt-the-template.md).
+- **2026-09-14 (2)** — Slice 1 committed (`981add8`). Slice 2 written: Vite + strict TS port of all
+  pages, core property tests, supply-chain config and gates verified locally, headless smoke test.
+  The pnpm trust gate refused `@types/node@22` (a provenance downgrade in `undici-types@6.21.0`),
+  and `vitest@4.1.8` carried a moderate advisory (moved to 4.1.11). See
+  [journal 2026-09-14-2](journal/2026-09-14-2-slice-2-typescript-port.md).

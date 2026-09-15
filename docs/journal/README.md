@@ -48,3 +48,4 @@ Terse and first-person is fine. This is a lab notebook, not a report.
 | [2026-07-08 (1)](2026-07-08-1-bulk-export-import.md) | Export All / Import All for local drafts ([e97075d](https://github.com/randallard/branching-video/commit/e97075d)) — filename renamed 2026-09-14 to the template convention |
 | [2026-07-08 (2)](2026-07-08-2-import-merge-conflicts.md) | Import merge conflict resolution (keep mine/backup/both) — committed as [3bb7fd8](https://github.com/randallard/branching-video/commit/3bb7fd8) |
 | [2026-09-14 (1)](2026-09-14-1-adopt-the-template.md) | Adopting the cr-ci-cd template: the audit, the three choices, slice 1 (conventions, CI, ADRs 0003–0019) |
+| [2026-09-14 (2)](2026-09-14-2-slice-2-typescript-port.md) | Slice 1 committed (981add8); slice 2 Vite + strict TS port, gates biting, ADR-0020/0021 proposed |

@@ -1,0 +1,16 @@
+# Supply-chain gates. Every setting here is decided by an ADR — cite it when changing one.
+
+# ADR-0012: native build scripts are blocked by default; any exception is listed and reviewed
+# individually, never blanket-approved. None needed today.
+onlyBuiltDependencies: []
+
+# ADR-0014: quarantine new releases for 14 days (in minutes), matched to renovate.json's
+# minimumReleaseAge. This gates every install, including a manual `pnpm add`; the Renovate
+# setting only paces Renovate's own PRs.
+minimumReleaseAge: 20160
+
+# ADR-0014: fail the install when a package's trust evidence decreases versus prior releases.
+trustPolicy: no-downgrade
+
+# ADR-0014: transitive dependencies resolve from the registry only — no git URLs or tarballs.
+blockExoticSubdeps: true

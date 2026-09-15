@@ -40,19 +40,20 @@ Both patterns are declared in `config.json`. The player handles the routing.
 
 ```
 /
-├── index.html              # Landing page — lists the shows in live/ (GitHub Pages entry point)
-├── create.html             # "Make your own" — fork + build instructions
-├── player.html             # The entire player (HTML, CSS, JS inline — no build step)
-├── editor.html             # Visual config editor — edit nodes/choices via forms, no hand-written JSON
-├── config.json             # Default config the player loads when no ?config= is given
-├── config.example.json     # Reference config — copy and edit
-├── live/                   # Your show configs; index.html + the editor's Configs menu list this folder
-│   └── manifest.json       # Generated list of shows (so the landing page works on GitHub Pages)
-├── tools/
-│   ├── validate-core.js    # Shared validation rules (used by both the CLI and the editor)
-│   ├── validate-config.js  # `node tools/validate-config.js <file>` — catches broken graphs
-│   └── gen-manifest.js     # `pnpm manifest` — rebuilds live/manifest.json
-└── README.md
+├── index.html, player.html, studio.html, editor.html, create.html
+│                           # The pages (markup + CSS); each loads its script from src/pages/
+├── public/                 # Served as-is at the site root
+│   ├── config.json         # Default config the player loads when no ?config= is given
+│   ├── config.example.json # Reference config — copy and edit
+│   └── live/               # Your show configs; the landing page + the editor's Configs menu list them
+├── src/
+│   ├── core/               # Pure logic, property-tested: config model, validation, serialization
+│   ├── shell/              # Browser IO: YouTube API, localStorage drafts, files, show discovery
+│   ├── ui/                 # DOM helpers
+│   └── pages/              # One entry script per page
+├── tools/validate-config.ts # `pnpm validate <file>` — catches broken graphs
+├── vite.config.ts          # Multi-page build; generates live/manifest.json from public/live/
+└── docs/                   # PROGRESS, ADRs (why it's built this way), journal
 ```
 
 ---
@@ -72,8 +73,7 @@ Two ways:
 - **Visual editor (recommended)** — run the dev server and open `editor.html`. It loads the existing `config.json`, gives you a form for every field, dropdowns for `target`/`returnTo` (no typos), and live validation as you type.
   - **New…** starts a fresh config — paste a YouTube URL (or video ID) and it scaffolds `masterVideoId`, a starter `intro` node, and auto-fills the show title from YouTube; leave it blank for an empty config.
   - **Open…** loads any config file from your machine; **Save As…** asks for a file name and saves it. On Chromium desktop it writes straight to a folder you pick; in other browsers it saves to your Downloads folder (enable "ask where to save each file" in your browser settings if you want to choose the location each time).
-  - **Configs** lists every `.json` in the `live/` folder and opens the selected one in the player (`player.html?config=…`). After adding shows, run `pnpm manifest` so they also appear on the landing page.
-  - Same zero-build, static-hostable file as the player.
+  - **Configs** lists every show in `public/live/` and opens the selected one in the player (`player.html?config=live/…`). The list (`live/manifest.json`) is generated from that folder by the dev server and the build, so new shows appear without an extra step.
 - **By hand** — see `config.example.json` for the full schema with comments. Minimum viable node:
 
 ```json
@@ -197,7 +197,7 @@ Any field whose name starts with `_` is ignored by the player and validator — 
 Before deploying, run:
 
 ```bash
-node tools/validate-config.js config.json
+pnpm validate public/live/your-show.json
 ```
 
 It checks: JSON parses, all `target`s and `returnTo`s resolve, exactly one default per choice set, `start < end`, `showChoicesAt` falls inside the segment, no duplicate ids, no unreachable nodes. Exits non-zero on errors so you can wire it into CI.
@@ -224,9 +224,9 @@ The player reads the hash on load and starts at that node. If no hash is present
 For a slice of the master video:
 
 1. Find the `start`/`end` timestamps in the existing upload (YouTube's scrubber shows seconds)
-2. Add a new node to `config.json` with those `start`/`end` values
+2. Add a new node to your show's config with those `start`/`end` values
 3. Wire it into the existing graph via another node's `choices`
-4. `node tools/validate-config.js config.json` to catch typos
+4. `pnpm validate public/live/your-show.json` to catch typos
 5. Push to GitHub → Pages redeploys automatically
 
 For a brand-new deep dive (separate upload):
@@ -262,12 +262,14 @@ For richer data, node transitions can be instrumented with custom events — see
 
 ```bash
 pnpm install
-pnpm dev          # serve . on 0.0.0.0:8080
-pnpm validate     # node tools/validate-config.js config.json
-pnpm manifest     # rebuild live/manifest.json after adding/removing shows
+pnpm dev          # Vite dev server on 0.0.0.0:8080
+pnpm validate     # validate public/config.json (or pass a file)
+pnpm lint         # ESLint, strict type-checked, zero warnings
+pnpm test         # Vitest + fast-check property tests on src/core
+pnpm build        # type-check and build the site into dist/
 ```
 
-The site entry point is `index.html` (the landing page); `editor.html` is the authoring tool. Both list shows from the `live/` folder.
+Requires Node 22.18+ and pnpm 11. The site entry point is `index.html` (the landing page); `studio.html` and `editor.html` are the authoring tools. Shows live in `public/live/`.
 
 Then visit `http://localhost:8080/player.html#intro`.
 
@@ -285,10 +287,10 @@ This is intentionally minimal. Some natural next steps:
 - **Progress memory** — `localStorage` can remember which nodes a viewer has seen across sessions
 - **Chapter menu** — a sidebar nav built from `config.json` titles
 - **Viewer-path analytics** — log node sequences to a free [Supabase](https://supabase.com) table
-- **Multiple shows** — drop config files in `live/` and the player loads any of them via `player.html?config=live/show2.json`; the landing page (`index.html`) and the editor's **Configs** menu both list that folder
+- **Multiple shows** — drop config files in `public/live/` and the player loads any of them via `player.html?config=live/show2.json`; the landing page (`index.html`) and the editor's **Configs** menu both list that folder
 
 ---
 
 ## License
 
-MIT — use it, fork it, build on it.
+Dual-licensed under **MIT OR Apache-2.0** ([LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE)) — use it, fork it, build on it.

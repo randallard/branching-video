@@ -79,26 +79,26 @@
         <p>You need a server (YouTube's embed API won't run from <code>file://</code>):</p>
         <pre><code>pnpm install
 pnpm dev        # serves on http://localhost:8080</code></pre>
+        <p>Needs Node 22.18+ and pnpm 11.</p>
         <p>Then open <code>http://localhost:8080/editor.html</code>.</p>
       </li>
 
       <li>
         <h3>Build a show in the editor</h3>
-        <p>Click <strong>New…</strong> and paste your YouTube URL — it scaffolds the config and pulls in the title. Add nodes for each segment (set <code>start</code>/<code>end</code> seconds), wire <strong>choices</strong> between them, and watch the live validation panel. When it's clean, <strong>Save As…</strong> into the <code>live/</code> folder.</p>
+        <p>Click <strong>New…</strong> and paste your YouTube URL — it scaffolds the config and pulls in the title. Add nodes for each segment (set <code>start</code>/<code>end</code> seconds), wire <strong>choices</strong> between them, and watch the live validation panel. When it's clean, <strong>Save As…</strong> into the <code>public/live/</code> folder.</p>
         <div class="note">Two branching patterns are built in: <strong>optional asides</strong> (viewer chooses to dive in, then resumes) and <strong>default asides</strong> (everyone sees it, with a skip button). See the <a href="https://github.com/randallard/branching-video#the-two-aside-patterns" target="_blank" rel="noopener">README</a> for the full schema.</div>
       </li>
 
       <li>
-        <h3>Refresh the show list &amp; validate</h3>
-        <p>Update the landing page's manifest, then sanity-check the graph:</p>
-        <pre><code>pnpm manifest                          # rebuild live/manifest.json
-node tools/validate-config.js live/your-show.json</code></pre>
+        <h3>Validate</h3>
+        <p>Sanity-check the graph (the show list updates itself from <code>public/live/</code>):</p>
+        <pre><code>pnpm validate public/live/your-show.json</code></pre>
       </li>
 
       <li>
         <h3>Commit &amp; push</h3>
-        <p>Push your <code>live/</code> configs and the manifest. GitHub Pages rebuilds automatically:</p>
-        <pre><code>git add live/ &amp;&amp; git commit -m "Add my show"
+        <p>Push your <code>public/live/</code> configs. GitHub Pages rebuilds automatically:</p>
+        <pre><code>git add public/live/ &amp;&amp; git commit -m "Add my show"
 git push</code></pre>
         <p>Your show is now live at <code>player.html?config=live/your-show.json</code> and listed on your home page.</p>
       </li>

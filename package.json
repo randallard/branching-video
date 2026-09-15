@@ -3,13 +3,31 @@
   "version": "0.1.0",
   "private": true,
   "description": "Lightweight branching video player on top of YouTube embeds.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "packageManager": "pnpm@11.5.3",
+  "engines": {
+    "node": ">=22.18.0",
+    "pnpm": ">=11.0.0"
+  },
   "scripts": {
-    "dev": "serve . --listen tcp://0.0.0.0:8080 --no-clipboard",
-    "validate": "node tools/validate-config.js config.json",
-    "manifest": "node tools/gen-manifest.js live"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint . --max-warnings 0",
+    "validate": "node tools/validate-config.ts"
   },
   "devDependencies": {
-    "serve": "^14.2.4"
-  },
-  "packageManager": "pnpm@10.19.0"
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.13.3",
+    "eslint": "10.4.1",
+    "fast-check": "4.7.0",
+    "license-checker-rseidelsohn": "5.0.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.60.1",
+    "vite": "8.0.16",
+    "vitest": "4.1.11"
+  }
 }
