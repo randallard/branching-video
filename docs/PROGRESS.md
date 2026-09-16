@@ -141,12 +141,21 @@ Not yet: the diff emitter — slice 3b, since it doesn't exist yet.
         (`snapshotNodeKeys`). ADR-0009 rules node ids out as *identity*, not as a derivation, so
         this doesn't contradict it — but it isn't written down either. 3b's diff emitter has to
         produce keys that line up with this, which is what makes it worth settling.
-     2. **What `node-removed` means beyond ADR-0008's "removal wins over later field sets."** 3a
-        decided a later `node-added` on the same key re-creates the node (a re-add is deliberate)
-        and a `show-snapshot` clears the removal record entirely (it's the whole show). 3b's
-        Studio delete-node flow is the first thing to exercise either.
+     2. ~~What `node-removed` means beyond ADR-0008.~~ **Settled by
+        [ADR-0024](adr/0024-node-removal-collisions-ask-rather-than-resolve.md)** (2026-09-15):
+        3a's defaults stand, but a delete-versus-edit collision is reported to the person when the
+        merge lands, and their answer is appended as an ordinary event. This adds work to 3b —
+        `reduce` must return the collisions it noticed alongside the shows, and import has to be
+        wired as something the UI observes rather than a silent background fold.
 4. **Slice 4 — the feature.** Single-show config import through Import All (multi-file) and
    Studio, per ADR-0011. Then retest with the ukulele file.
+   Then, on top of the event log and in this order:
+   - **Per-field value history** ([ADR-0023](adr/0023-per-field-value-history.md)) — derived from
+     the events, so no schema work; the cost is an affordance on every edited field across Studio
+     and the Editor.
+   - **Delete-versus-edit notification**
+     ([ADR-0024](adr/0024-node-removal-collisions-ask-rather-than-resolve.md)) — the UI half. The
+     `reduce` half lands in 3b, because the collision has to be detected before it can be shown.
 5. **Cutover** — done 2026-09-14 (see Status); its documentation debt cleared and shipped
    2026-09-15 (`f0d76df`).
    `README.md`'s "Deploy" section and `create.html` step 2 now say Pages source = GitHub Actions
@@ -172,17 +181,18 @@ Carried over, not yet scheduled (from `notes.txt`):
 
 ## Open questions
 
-- **Where snapshot node keys come from** — see slice 3b in the worklist. Needs an ADR.
-- **What `node-removed` means beyond "removal wins over later field sets"** — same. Needs an ADR.
+- **Where snapshot node keys come from.** The one decision from 3a still unrecorded — see slice 3b
+  in the worklist. Needs an ADR.
 
-## Answered, needing an ADR
+## Answered 2026-09-15, now ADRs
 
-- **Same-field edits on two devices resolve to the later clock (ADR-0008), and the losing value
-  stays in the log with nothing to show it.** Asked whether to build a history view or accept the
-  loss; **Ryan chose to build one (2026-09-15).** Not yet written up, and it can't start before
-  3b — until Studio and the Editor emit per-field events there is no superseded value to recover.
-  Open inside the decision: whether it's a per-field "what else has this been" affordance, a
-  per-show "what changed and when" log, or both.
+- Same-field edits lose a value silently → **build a per-field "what else has this been" history**,
+  [ADR-0023](adr/0023-per-field-value-history.md). Derived from the events, no new event kind;
+  recovering an old value is an ordinary edit. Can't start before 3b.
+- A node deleted on one device and edited on another → **tell the person at the time and let them
+  decide**, [ADR-0024](adr/0024-node-removal-collisions-ask-rather-than-resolve.md). The reducer
+  still resolves deterministically so nothing blocks; the collision is reported and the answer is
+  appended as an ordinary event.
 
 ## Closed, kept for the record
 
@@ -236,3 +246,8 @@ and [`reviews/`](reviews/README.md) for stance reviews._
 - **2026-09-15 (3)** — Slice 3a: the event-log core and store, additive and green (`4b7f39c`),
   tests 30 → 71. Slice 3b (the page wiring) is next. See
   [journal 2026-09-15-3](journal/2026-09-15-3-slice-3a-event-log-core.md).
+- **2026-09-15 (4)** — Ryan answered both outstanding design questions:
+  [ADR-0023](adr/0023-per-field-value-history.md) (per-field "what else has this been" history) and
+  [ADR-0024](adr/0024-node-removal-collisions-ask-rather-than-resolve.md) (delete-versus-edit
+  collisions are reported, not silently resolved). 0024 widens slice 3b: `reduce` must report
+  collisions and import must be observable. Snapshot node keys remain the one open question.

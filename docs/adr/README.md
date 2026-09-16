@@ -101,3 +101,5 @@ Copy [`TEMPLATE.md`](TEMPLATE.md).
 | [0020](0020-vite-multi-page-build-with-relative-base.md) | Vite multi-page build with a relative asset base | Accepted |
 | [0021](0021-generate-show-manifest-at-build.md) | Generate live/manifest.json from public/live in dev and at build | Accepted |
 | [0022](0022-no-choice-nodes-continue-to-next-node.md) | A node with no way forward continues into the next node in order | Accepted |
+| [0023](0023-per-field-value-history.md) | A superseded field value is recoverable from a per-field history | Accepted |
+| [0024](0024-node-removal-collisions-ask-rather-than-resolve.md) | A node deleted on one device and edited on another asks, rather than resolving silently | Accepted |
