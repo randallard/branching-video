@@ -391,7 +391,10 @@ export function toConfig(show: ShowState): ShowConfig {
   const config: ShowConfig = {
     title: show.title,
     startNode: show.startNode,
-    nodes: show.nodes.map((n) => n.node),
+    // Copied, not shared: pages edit the config they are given in place, and handing out the
+    // reduced state's own nodes would let an edit mutate the very thing it is about to be
+    // diffed against -- so the diff would see no change and silently save nothing.
+    nodes: show.nodes.map((n) => cloneNode(n.node)),
   };
   if (show.choiceDisplaySeconds !== undefined) {
     config.choiceDisplaySeconds = show.choiceDisplaySeconds;
