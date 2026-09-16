@@ -35,11 +35,34 @@ export interface ShowState {
   updatedAt: string;
 }
 
+/**
+ * A node one device deleted while another was editing it (ADR-0024). The removal won — that is
+ * ADR-0008's rule and the reducer still applies it — but the discarded edits mean somebody's
+ * intent was dropped, so the person is told rather than left to notice.
+ *
+ * Derived purely from the event set, like everything else here. It clears when the node comes
+ * back (`node-added`), when a snapshot replaces the show, or when a later `node-removed` puts the
+ * removal after the edits — which is how "no, stay deleted" gets recorded.
+ */
+export interface RemovalCollision {
+  showId: string;
+  nodeKey: string;
+  /** The node as it stood immediately before removal, so the UI can offer to restore it. */
+  node: ShowNode;
+  removedAt: string;
+  /** How many edits landed on the node after it was removed and were discarded. */
+  discardedEdits: number;
+  /** The newest discarded edit, which is the "you were working on this at..." in the notice. */
+  lastEditAt: string;
+}
+
 export interface ShowsState {
   /** Sorted by `updatedAt` descending, then `showId`, so the most recently edited show is first. */
   shows: ShowState[];
   /** Kinds this build didn't recognise, for a diagnostic — never an error. */
   unknownKinds: string[];
+  /** Delete-versus-edit collisions to report (ADR-0024), newest removal first. */
+  collisions: RemovalCollision[];
 }
 
 interface Working {
@@ -51,6 +74,8 @@ interface Working {
   nodes: Map<string, NodeState>;
   /** Removal wins over later field sets on that node (ADR-0008). */
   removed: Set<string>;
+  /** Removed keys whose later edits were discarded, pending a decision (ADR-0024). */
+  collisions: Map<string, RemovalCollision>;
   deleted: boolean;
   updatedAt: string;
 }
@@ -64,6 +89,7 @@ function emptyShow(showId: string): Working {
     masterVideoId: undefined,
     nodes: new Map(),
     removed: new Set(),
+    collisions: new Map(),
     deleted: false,
     updatedAt: "",
   };
@@ -208,14 +234,24 @@ function applyNodeField(entry: NodeState, field: NodeField, value: unknown): voi
   }
 }
 
+/** Record that an edit landed on a node that was already removed, and was therefore dropped. */
+function noteDiscardedEdit(show: Working, nodeKey: string, at: string): void {
+  const collision = show.collisions.get(nodeKey);
+  if (collision === undefined) return;
+  collision.discardedEdits += 1;
+  if (at > collision.lastEditAt) collision.lastEditAt = at;
+}
+
 function applySnapshot(show: Working, config: ShowConfig): void {
   show.title = config.title;
   show.startNode = config.startNode;
   show.choiceDisplaySeconds = config.choiceDisplaySeconds;
   show.masterVideoId = config.masterVideoId;
   show.nodes.clear();
-  // A snapshot is the whole show, so it also clears the record of what was removed before it.
+  // A snapshot is the whole show, so it also clears the record of what was removed before it --
+  // and with it any pending collision, which was about nodes this snapshot has just replaced.
   show.removed.clear();
+  show.collisions.clear();
   const keys = snapshotNodeKeys(config);
   const orders = orderKeys(config.nodes.length);
   config.nodes.forEach((node, i) => {
@@ -255,8 +291,10 @@ export function reduce(events: readonly ShowEvent[]): ShowsState {
         applyShowField(show, e.field, e.value);
         break;
       case "node-added": {
-        // A re-add is a deliberate act, so it lifts an earlier removal of that key.
+        // A re-add is a deliberate act, so it lifts an earlier removal of that key -- and settles
+        // any collision it caused (ADR-0024: answering is just another event).
         show.removed.delete(e.nodeKey);
+        show.collisions.delete(e.nodeKey);
         show.nodes.set(e.nodeKey, {
           nodeKey: e.nodeKey,
           order: e.order,
@@ -265,21 +303,39 @@ export function reduce(events: readonly ShowEvent[]): ShowsState {
         break;
       }
       case "node-field-set": {
-        if (show.removed.has(e.nodeKey)) break;
+        if (show.removed.has(e.nodeKey)) {
+          noteDiscardedEdit(show, e.nodeKey, e.at);
+          break;
+        }
         const entry = show.nodes.get(e.nodeKey);
         if (entry !== undefined) applyNodeField(entry, e.field, e.value);
         break;
       }
       case "node-choices-set": {
-        if (show.removed.has(e.nodeKey)) break;
+        if (show.removed.has(e.nodeKey)) {
+          noteDiscardedEdit(show, e.nodeKey, e.at);
+          break;
+        }
         const entry = show.nodes.get(e.nodeKey);
         if (entry !== undefined) entry.node.choices = cloneChoices(e.choices);
         break;
       }
-      case "node-removed":
+      case "node-removed": {
+        const doomed = show.nodes.get(e.nodeKey);
         show.nodes.delete(e.nodeKey);
         show.removed.add(e.nodeKey);
+        // Re-arm: a fresh removal supersedes any earlier one, so edits that were discarded before
+        // it no longer count. That is how "no, leave it deleted" is recorded — as another removal.
+        show.collisions.set(e.nodeKey, {
+          showId: e.showId,
+          nodeKey: e.nodeKey,
+          node: doomed?.node ?? cloneNode({}),
+          removedAt: e.at,
+          discardedEdits: 0,
+          lastEditAt: "",
+        });
         break;
+      }
       case "show-deleted":
         show.deleted = true;
         break;
@@ -316,7 +372,17 @@ export function reduce(events: readonly ShowEvent[]): ShowsState {
       (a.showId < b.showId ? -1 : a.showId > b.showId ? 1 : 0)
   );
 
-  return { shows: out, unknownKinds: [...unknownKinds].sort() };
+  // Only a removal that actually discarded something is worth interrupting someone about.
+  const collisions = [...shows.values()]
+    .flatMap((s) => [...s.collisions.values()])
+    .filter((c) => c.discardedEdits > 0)
+    .sort(
+      (a, b) =>
+        (a.removedAt < b.removedAt ? 1 : a.removedAt > b.removedAt ? -1 : 0) ||
+        (a.nodeKey < b.nodeKey ? -1 : a.nodeKey > b.nodeKey ? 1 : 0)
+    );
+
+  return { shows: out, unknownKinds: [...unknownKinds].sort(), collisions };
 }
 
 /** The publish-format config for a reduced show (ADR-0010) — what Studio, the Editor, the

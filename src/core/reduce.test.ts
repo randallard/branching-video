@@ -246,6 +246,123 @@ describe("reduce", () => {
       expect(findShow(reduce(events), "s")?.nodes).toHaveLength(1);
     });
 
+    it("reports a delete-versus-edit collision (ADR-0024)", () => {
+      const events = [
+        {
+          ...base("add", "2026-09-01T00:00:00.000Z"),
+          kind: "node-added",
+          showId: "s",
+          nodeKey: "k",
+          node: { id: "intro", title: "Work in progress", choices: [] },
+          order: "V",
+        },
+        { ...base("rm", "2026-09-02T00:00:00.000Z"), kind: "node-removed", showId: "s", nodeKey: "k" },
+        {
+          ...base("phone", "2026-09-03T00:00:00.000Z"),
+          kind: "node-field-set",
+          showId: "s",
+          nodeKey: "k",
+          field: "title",
+          value: "Edited on the phone",
+        },
+      ] as ShowEvent[];
+      const state = reduce(events);
+      expect(state.collisions).toHaveLength(1);
+      const c = state.collisions[0];
+      expect(c?.nodeKey).toBe("k");
+      expect(c?.discardedEdits).toBe(1);
+      expect(c?.lastEditAt).toBe("2026-09-03T00:00:00.000Z");
+      // The node as it stood before deletion, so the notice can offer to bring it back.
+      expect(c?.node.title).toBe("Work in progress");
+    });
+
+    it("reports nothing when the removal is simply the last word", () => {
+      const events = [
+        {
+          ...base("add", "2026-09-01T00:00:00.000Z"),
+          kind: "node-added",
+          showId: "s",
+          nodeKey: "k",
+          node: { id: "intro", title: "Gone", choices: [] },
+          order: "V",
+        },
+        {
+          ...base("edit", "2026-09-02T00:00:00.000Z"),
+          kind: "node-field-set",
+          showId: "s",
+          nodeKey: "k",
+          field: "title",
+          value: "Still here",
+        },
+        { ...base("rm", "2026-09-03T00:00:00.000Z"), kind: "node-removed", showId: "s", nodeKey: "k" },
+      ] as ShowEvent[];
+      expect(reduce(events).collisions).toEqual([]);
+    });
+
+    it("settles a collision when the node is restored", () => {
+      // ADR-0024: answering is just another event.
+      const events = [
+        { ...base("rm", "2026-09-01T00:00:00.000Z"), kind: "node-removed", showId: "s", nodeKey: "k" },
+        {
+          ...base("edit", "2026-09-02T00:00:00.000Z"),
+          kind: "node-field-set",
+          showId: "s",
+          nodeKey: "k",
+          field: "title",
+          value: "Edited after deletion",
+        },
+        {
+          ...base("restore", "2026-09-03T00:00:00.000Z"),
+          kind: "node-added",
+          showId: "s",
+          nodeKey: "k",
+          node: { id: "intro", title: "Brought back", choices: [] },
+          order: "V",
+        },
+      ] as ShowEvent[];
+      expect(reduce(events).collisions).toEqual([]);
+    });
+
+    it("settles a collision when the answer is 'leave it deleted'", () => {
+      // Recorded as a second removal, which puts the discarded edits behind it.
+      const events = [
+        { ...base("rm", "2026-09-01T00:00:00.000Z"), kind: "node-removed", showId: "s", nodeKey: "k" },
+        {
+          ...base("edit", "2026-09-02T00:00:00.000Z"),
+          kind: "node-field-set",
+          showId: "s",
+          nodeKey: "k",
+          field: "title",
+          value: "Edited after deletion",
+        },
+      ] as ShowEvent[];
+      expect(reduce(events).collisions).toHaveLength(1);
+
+      const answered = [
+        ...events,
+        { ...base("stay-gone", "2026-09-03T00:00:00.000Z"), kind: "node-removed", showId: "s", nodeKey: "k" },
+      ] as ShowEvent[];
+      expect(reduce(answered).collisions).toEqual([]);
+      expect(findShow(reduce(answered), "s")?.nodes).toEqual([]);
+    });
+
+    it("a snapshot clears any pending collision", () => {
+      const config = { title: "T", startNode: "intro", nodes: [{ id: "intro", title: "I", choices: [] }] };
+      const events = [
+        { ...base("rm", "2026-09-01T00:00:00.000Z"), kind: "node-removed", showId: "s", nodeKey: "k" },
+        {
+          ...base("edit", "2026-09-02T00:00:00.000Z"),
+          kind: "node-field-set",
+          showId: "s",
+          nodeKey: "k",
+          field: "title",
+          value: "Edited after deletion",
+        },
+        { ...base("snap", "2026-09-03T00:00:00.000Z"), kind: "show-snapshot", showId: "s", config },
+      ] as ShowEvent[];
+      expect(reduce(events).collisions).toEqual([]);
+    });
+
     it("tracks delete and restore as ordinary last-writer edits", () => {
       const events = [
         { ...base("d", "2026-09-01T00:00:00.000Z"), kind: "show-deleted", showId: "s" },
