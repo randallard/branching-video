@@ -131,6 +131,20 @@ Two ways to attach video to nodes:
 
 You can mix the two freely: main-line nodes pull from the master video; deep dives point at separate uploads.
 
+> ⚠️ **Finish the video with your last node.** Playback stops at the last node's `end` — whatever
+> is left in the source video after that is never shown. If your master video runs 19:50 and your
+> last node ends at 13:26, those final 6½ minutes are unreachable and viewers get the "That's a
+> wrap" screen instead.
+>
+> So make the last node run to the end of the video. Either **leave its `end` unset** (the
+> segment plays until the video itself ends — the simplest option), or set `end` to the video's
+> full duration. If you *want* to stop before the video ends, that's fine — give the last node an
+> `endScreen` so viewers get a deliberate ending rather than a generic replay prompt.
+>
+> Watch for this after marking chapters in Studio: Studio writes an `end` on every node it marks,
+> including the last one, so a show you stopped chaptering partway through will stop playing
+> there too.
+
 ```json
 {
   "title": "Your show title",
@@ -188,9 +202,9 @@ You can mix the two freely: main-line nodes pull from the master video; deep div
 | `title` | ✅ | Human-readable label (browser tab, analytics) |
 | `videoId` | — | YouTube video ID. Required unless `masterVideoId` is set. |
 | `start` | — | Seconds into the source video to begin this segment |
-| `end` | — | Seconds into the source video to end this segment. YouTube stops here and fires the choice flow. |
+| `end` | — | Seconds into the source video to end this segment. YouTube stops here and fires the choice flow. Leave it unset to play until the source video ends — **do this on your last node**, or the rest of the video is unreachable (see the warning under [config.json schema](#configjson-schema)). |
 | `showChoicesAt` | — | Seconds into the source video at which to reveal choices *mid-segment*. Video keeps playing; countdown runs until `end`. |
-| `choices` | ✅ | Array of choice objects. If empty, the segment plays on into the **next node in the list** when it ends — unless it's an aside with `returnTo`, or has an `endScreen`. The last node with no choices shows a generic "Watch again" screen. |
+| `choices` | ✅ | Array of choice objects. If empty, the segment plays on into the **next node in the list** when it ends — unless it's an aside with `returnTo`, or has an `endScreen`. The last node with no choices shows a generic "That's a wrap / Watch again" screen at its `end`, so give that node an unset `end` (play to the video's end) or an `endScreen`. |
 | `isAside` | — | Marks this node as an aside (affects badge/styling) |
 | `returnTo` | — | Node to auto-route to when this segment ends (no choice needed) |
 | `defaultAside` | — | If `true`, shows a persistent "Skip → back to main" button (requires `returnTo`) |
@@ -242,6 +256,8 @@ For a slice of the master video:
 1. Find the `start`/`end` timestamps in the existing upload (YouTube's scrubber shows seconds)
 2. Add a new node to your show's config with those `start`/`end` values
 3. Wire it into the existing graph via another node's `choices`
+   — and if the new node is now the **last** one, leave its `end` unset so it plays to the end of
+   the video, or the remainder is cut off
 4. `pnpm validate public/live/your-show.json` to catch typos
 5. Push to GitHub → CI builds the site and redeploys Pages automatically
 

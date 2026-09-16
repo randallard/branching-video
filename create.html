@@ -93,6 +93,7 @@ pnpm dev        # serves on http://localhost:8080</code></pre>
       <li>
         <h3>Build a show in the editor</h3>
         <p>Click <strong>New…</strong> and paste your YouTube URL — it scaffolds the config and pulls in the title. Add nodes for each segment (set <code>start</code>/<code>end</code> seconds), wire <strong>choices</strong> between them, and watch the live validation panel. When it's clean, <strong>Save As…</strong> into the <code>public/live/</code> folder.</p>
+        <div class="note">⚠️ <strong>Make your last node run to the end of the video.</strong> Playback stops at the last node's <code>end</code>, and anything left in the source video after that is never shown — viewers get the "That's a wrap" screen instead. Easiest fix: leave the last node's <code>end</code> unset so it plays until the video itself ends. If you mean to stop early, give that node an <code>endScreen</code> so the ending looks deliberate.</div>
         <div class="note">Two branching patterns are built in: <strong>optional asides</strong> (viewer chooses to dive in, then resumes) and <strong>default asides</strong> (everyone sees it, with a skip button). See the <a href="https://github.com/randallard/branching-video#the-two-aside-patterns" target="_blank" rel="noopener">README</a> for the full schema.</div>
       </li>
 

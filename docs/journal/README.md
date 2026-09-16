@@ -50,3 +50,4 @@ Terse and first-person is fine. This is a lab notebook, not a report.
 | [2026-09-14 (1)](2026-09-14-1-adopt-the-template.md) | Adopting the cr-ci-cd template: the audit, the three choices, slice 1 (conventions, CI, ADRs 0003–0019) |
 | [2026-09-14 (2)](2026-09-14-2-slice-2-typescript-port.md) | Slice 1 committed (981add8); slice 2 Vite + strict TS port, gates biting, ADR-0020/0021 proposed |
 | [2026-09-15](2026-09-15-deploy-instructions-catch-up.md) | README + `create.html` deploy instructions catch up with the Actions cutover; the stale "no build step" copy reworded |
+| [2026-09-15 (2)](2026-09-15-2-browser-pass-last-node-wrap.md) | Browser pass: ADR-0022 play-through confirmed; last node wraps at 806.5s of an 1190s video — Ryan kept the behaviour, documented the authoring rule |

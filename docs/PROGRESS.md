@@ -27,9 +27,14 @@ licence allowlist, OSV-Scanner container on a clean export (no issues), `pnpm va
 16-check headless-Chromium smoke test of the built site and the dev server (home page shows +
 legacy drafts, Studio resume and ukulele import, Editor load/validation/Configs menu, Player
 title/menu/missing-config, Import All merge modal + keep-both) — all passing.
-**Not verified — needs Ryan in a real browser:** actual YouTube playback, segment transitions,
-choice countdown, asides/back-to-branch, Studio marking against a playing video, the Editor's
-mobile drawer and Chromium Save As. See [journal 2026-09-14-2](journal/2026-09-14-2-slice-2-typescript-port.md).
+**Partial browser pass done 2026-09-15:** the ukulele show plays through all eleven no-choice
+nodes as ADR-0022 intended. It surfaced that the show stops 6:24 short of the master video (last
+node ends 806.5, video is 1190) — Ryan kept the wrap behaviour and had the authoring rule
+documented instead; ADR-0022 stands unamended and no code changed. See
+[journal 2026-09-15-2](journal/2026-09-15-2-browser-pass-last-node-wrap.md).
+**Still not verified — needs Ryan in a real browser:** YouTube playback quirks, segment
+transitions, choice countdown, asides/back-to-branch, Studio marking against a playing video, the
+Editor's mobile drawer and Chromium Save As. See [journal 2026-09-14-2](journal/2026-09-14-2-slice-2-typescript-port.md).
 
 **Also in slice 2, by Ryan's decisions (2026-09-14):** ADR-0020 (relative base) and ADR-0021
 (generated manifest) accepted; **ADR-0022** — a node with no choices (and no aside `returnTo` or
@@ -117,6 +122,9 @@ Not yet: the event log reducer and import idempotence — slice 3 (ADR-0004).
    reworded — see [journal 2026-09-15](journal/2026-09-15-deploy-instructions-catch-up.md).
 
 Found in slice 2, not yet scheduled:
+- **No validator warning for a show that stops short of its video.** Raised 2026-09-15 and not
+  chosen; it would need the source video's duration, which the validator has no way to get
+  without a network call. The README and `create.html` carry the rule instead.
 - **Editor marks a freshly loaded file as unsaved** (`loadConfig` → `structural()` sets `dirty`),
   so leaving the Editor prompts even with no edits. Pre-existing; kept in the port, commented.
 - No favicon (404 on every page).
@@ -173,3 +181,8 @@ and [`reviews/`](reviews/README.md) for stance reviews._
   for the Actions build, three falsified "no build step" claims reworded, committed and pushed
   (`f0d76df`), CI green, corrected copy confirmed live. See
   [journal 2026-09-15](journal/2026-09-15-deploy-instructions-catch-up.md).
+- **2026-09-15 (2)** — Partial browser pass: ADR-0022 play-through confirmed on the ukulele show.
+  The last node wraps at 806.5s of an 1190s video; Ryan chose to keep the behaviour and document
+  the authoring rule (finish with a node that reaches the end of the video, or give it an
+  `endScreen`). README + `create.html` updated, no code change. See
+  [journal 2026-09-15-2](journal/2026-09-15-2-browser-pass-last-node-wrap.md).
