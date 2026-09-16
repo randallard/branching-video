@@ -131,22 +131,15 @@ Not yet: the diff emitter — slice 3b, since it doesn't exist yet.
      Import All at event bundles; the ADR-0011 update-or-add prompt for single-show files; unify
      the Studio and Editor serializers (they differ today, preserved deliberately in slice 2);
      property tests for the diff emitter.
-   - **Two decisions 3a had to make that no ADR covers — Ryan's call, and 3b is when they stop
-     being theoretical.** Both are implemented and tested, so nothing is blocked; what's missing
-     is the decision record.
-     1. **Where snapshot node keys come from.** A `show-snapshot` arrives as a plain config whose
-        nodes have no `nodeKey`, but later per-field edits must target those nodes, and two
-        devices importing the same file must derive the same keys or the edits land on nothing.
-        3a uses `n:<node.id>`, disambiguated by position when ids repeat or are blank
-        (`snapshotNodeKeys`). ADR-0009 rules node ids out as *identity*, not as a derivation, so
-        this doesn't contradict it — but it isn't written down either. 3b's diff emitter has to
-        produce keys that line up with this, which is what makes it worth settling.
-     2. ~~What `node-removed` means beyond ADR-0008.~~ **Settled by
-        [ADR-0024](adr/0024-node-removal-collisions-ask-rather-than-resolve.md)** (2026-09-15):
-        3a's defaults stand, but a delete-versus-edit collision is reported to the person when the
-        merge lands, and their answer is appended as an ordinary event. This adds work to 3b —
-        `reduce` must return the collisions it noticed alongside the shows, and import has to be
-        wired as something the UI observes rather than a silent background fold.
+   - **Both decisions 3a had to make are now ADRs (2026-09-15), so 3b starts with them settled.**
+     - [ADR-0025](adr/0025-snapshot-node-keys-derived-from-node-id.md) — snapshot node keys come
+       from the node's `id`, falling back to a content hash (not position) for duplicate or blank
+       ids. Already implemented and property-tested. 3b's diff emitter must produce keys that
+       agree with this.
+     - [ADR-0024](adr/0024-node-removal-collisions-ask-rather-than-resolve.md) — delete-versus-edit
+       collisions are reported rather than silently resolved. **This adds work to 3b:** `reduce`
+       must return the collisions it noticed alongside the shows, and import must be wired as
+       something the UI observes rather than a silent background fold.
 4. **Slice 4 — the feature.** Single-show config import through Import All (multi-file) and
    Studio, per ADR-0011. Then retest with the ukulele file.
    Then, on top of the event log and in this order:
@@ -181,8 +174,7 @@ Carried over, not yet scheduled (from `notes.txt`):
 
 ## Open questions
 
-- **Where snapshot node keys come from.** The one decision from 3a still unrecorded — see slice 3b
-  in the worklist. Needs an ADR.
+_None outstanding._ The three that slice 3a raised were all settled 2026-09-15; see below.
 
 ## Answered 2026-09-15, now ADRs
 
@@ -193,6 +185,10 @@ Carried over, not yet scheduled (from `notes.txt`):
   decide**, [ADR-0024](adr/0024-node-removal-collisions-ask-rather-than-resolve.md). The reducer
   still resolves deterministically so nothing blocks; the collision is reported and the answer is
   appended as an ordinary event.
+- Where snapshot node keys come from → **the node's own `id`, with a content-hash fallback for
+  duplicate or blank ids**, [ADR-0025](adr/0025-snapshot-node-keys-derived-from-node-id.md).
+  Implemented in `snapshotNodeKeys`: the positional fallback is gone, because reordering a config
+  used to repoint keys at the wrong nodes silently.
 
 ## Closed, kept for the record
 
@@ -251,3 +247,10 @@ and [`reviews/`](reviews/README.md) for stance reviews._
   [ADR-0024](adr/0024-node-removal-collisions-ask-rather-than-resolve.md) (delete-versus-edit
   collisions are reported, not silently resolved). 0024 widens slice 3b: `reduce` must report
   collisions and import must be observable. Snapshot node keys remain the one open question.
+- **2026-09-15 (5)** — Deliberated the last open question and settled it as
+  [ADR-0025](adr/0025-snapshot-node-keys-derived-from-node-id.md): snapshot node keys derive from
+  the node's `id`, with a content-hash fallback replacing the positional one. The deciding
+  constraint was ADR-0011's event id, which covers the config but not the keys — so carrying keys
+  in the event would give two devices the same event id with different payloads. `snapshotNodeKeys`
+  hardened accordingly; the two new tests fail against the old positional rule. No open questions
+  outstanding.

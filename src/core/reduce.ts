@@ -14,6 +14,7 @@ import { normalizeNode } from "./config.ts";
 import type { NodeField, ShowEvent, ShowField } from "./events.ts";
 import { compareEvents } from "./events.ts";
 import { orderKeys } from "./order.ts";
+import { contentHash } from "./canonical.ts";
 
 export interface NodeState {
   nodeKey: string;
@@ -79,18 +80,39 @@ function cloneChoices(choices: unknown): Choice[] {
 }
 
 /**
- * Node keys for a snapshot, derived from the snapshot's own content so that the same snapshot
- * imported on two devices produces the same keys and later per-field edits line up. A node's
- * `id` is the natural handle (it's unique in any config that validates); duplicates and blanks
- * fall back to position.
+ * Node keys for a snapshot (ADR-0025).
+ *
+ * A snapshot arrives as a plain config whose nodes carry no key, but every later edit targets a
+ * key — so the keys have to be derived, and derived *identically on every device*, or a merge
+ * turns one edited node into two. ADR-0011 forces that too: the snapshot's event id is a hash of
+ * its content, so two devices importing the same file must agree on everything downstream of it.
+ *
+ * The node's own `id` is the handle, because it survives the two things that actually happen to a
+ * show: re-importing an updated file, and reordering nodes. Position does not survive either, and
+ * a hash of the whole node does not survive an edit.
+ *
+ * When an id is duplicated or blank it can't identify anything, so those nodes fall back to a hash
+ * of their content rather than to their position — position is what makes reordering a config
+ * silently repoint keys at the wrong nodes. Nodes that are *fully* identical still land on the
+ * same hash, so they take an occurrence suffix; that is safe precisely because identical nodes are
+ * interchangeable, and it keeps both of them rather than collapsing them into one.
  */
 export function snapshotNodeKeys(config: ShowConfig): string[] {
-  const seen = new Map<string, number>();
-  return config.nodes.map((node, index) => {
-    const base = node.id === "" ? `i:${String(index)}` : `n:${node.id}`;
-    const count = seen.get(base) ?? 0;
-    seen.set(base, count + 1);
-    return count === 0 ? base : `${base}#${String(count)}`;
+  const idCounts = new Map<string, number>();
+  for (const node of config.nodes) {
+    idCounts.set(node.id, (idCounts.get(node.id) ?? 0) + 1);
+  }
+
+  const used = new Map<string, number>();
+  return config.nodes.map((node) => {
+    let base: string;
+    if (node.id === "") base = `h:${contentHash(node)}`;
+    else if ((idCounts.get(node.id) ?? 0) > 1) base = `n:${node.id}:${contentHash(node)}`;
+    else base = `n:${node.id}`;
+
+    const seen = used.get(base) ?? 0;
+    used.set(base, seen + 1);
+    return seen === 0 ? base : `${base}#${String(seen)}`;
   });
 }
 

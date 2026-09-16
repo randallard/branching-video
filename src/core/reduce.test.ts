@@ -86,6 +86,49 @@ describe("reduce", () => {
     );
   });
 
+  it("keys follow the node, not its position (ADR-0025)", () => {
+    // Reordering a config must not repoint a key at a different node -- otherwise re-importing a
+    // reordered file lands every prior edit on the wrong node, silently. `arbitraryConfig` draws
+    // node ids from a small set, so duplicate ids -- the case this hardens -- come up often.
+    fc.assert(
+      fc.property(arbitraryConfig, (config) => {
+        const mapping = (c: typeof config): Set<string> =>
+          new Set(
+            snapshotNodeKeys(c).map((key, i) => `${key}\u0000${JSON.stringify(c.nodes[i])}`)
+          );
+        const reversed = { ...config, nodes: [...config.nodes].reverse() };
+        expect(mapping(reversed)).toEqual(mapping(config));
+      })
+    );
+  });
+
+  it("keeps two fully identical nodes rather than collapsing them", () => {
+    const node = { id: "dupe", title: "Same", choices: [] };
+    const config = { title: "T", startNode: "dupe", nodes: [node, { ...node }] };
+    expect(new Set(snapshotNodeKeys(config)).size).toBe(2);
+    const state = reduce([
+      { id: "s1", at: AT, v: 1, kind: "show-snapshot", showId: "s", config },
+    ]);
+    expect(findShow(state, "s")?.nodes).toHaveLength(2);
+  });
+
+  it("distinguishes same-id nodes by content, not by position", () => {
+    const config = {
+      title: "T",
+      startNode: "x",
+      nodes: [
+        { id: "x", title: "First", choices: [] },
+        { id: "x", title: "Second", choices: [] },
+      ],
+    };
+    const [a, b] = snapshotNodeKeys(config);
+    const swapped = { ...config, nodes: [...config.nodes].reverse() };
+    const [ra, rb] = snapshotNodeKeys(swapped);
+    // The key that meant "Second" still means "Second" after the swap.
+    expect(rb).toBe(a);
+    expect(ra).toBe(b);
+  });
+
   describe("last writer wins per field (ADR-0008)", () => {
     const set = (id: string, at: string, field: string, value: unknown): ShowEvent =>
       ({ id, at, v: 1, kind: "show-field-set", showId: "s", field, value }) as ShowEvent;
