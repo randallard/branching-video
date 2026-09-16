@@ -38,3 +38,17 @@ settings; `ol.steps > li` uses a child combinator, so the numbered-circle stylin
 into it, and a small rule was added for the inner list's spacing. Left uncommitted for Ryan:
 `create.html` is a page people read, and pushing it redeploys the site — so the rewritten step is
 now also on the browser-pass list.
+
+## Shipped
+
+Committed as [`f0d76df`](https://github.com/randallard/branching-video/commit/f0d76df) and pushed
+(`gr push`, then `gr push --remote origin` — `gr push` alone only reaches the `data` backups, not
+GitHub, and it's the GitHub push that redeploys). CI run
+[35040523912](https://github.com/randallard/branching-video/actions/runs/35040523912) green —
+docs hygiene, TS fast gates, TS supply chain, SBOM, OSV scan and deploy all passing, Rust jobs
+skipped as designed — and the deployed `create.html` was re-fetched from the live URL to confirm
+it now serves the GitHub Actions + `DEPLOY_PAGES` step and carries none of the old "no build
+step" / "rebuilds automatically" copy.
+
+Ryan's browser pass still owes this page a human read: the fetch proves the right bytes are
+being served, not that the rewritten step reads clearly to someone following it.
