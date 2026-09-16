@@ -1,14 +1,19 @@
 # Progress & Status
 
-_Last updated: 2026-09-14_
+_Last updated: 2026-09-15_
 
 ## Status / next
 
 **Status:** Mid-migration onto `cr-ci-cd-rust-typescript-template`
-([ADR-0003](adr/0003-retrofit-cr-ci-cd-template-onto-existing-repo.md)), on branch
-**`adopt-template`**. `main` is unchanged: it is still the no-build static site (five HTML pages,
-inline JS, drafts in `localStorage`) that GitHub Pages serves from the branch root at
-https://randallard.github.io/branching-video/.
+([ADR-0003](adr/0003-retrofit-cr-ci-cd-template-onto-existing-repo.md)). **Slices 1 and 2 are on
+`main` and live** (2026-09-14): https://randallard.github.io/branching-video/ is now deployed by
+CI from the Vite build (ADR-0006 cutover done — `DEPLOY_PAGES=true`, Pages source = GitHub
+Actions). First CI run on `main` (`3a51695`, run 34924103244): docs hygiene, TS fast gates, TS
+supply chain, SBOM, OSV scan and deploy all green; Rust jobs skipped as designed. The 16-check
+headless smoke test passes against the live URL. Drafts are still in `localStorage`.
+**2026-09-15:** the deploy instructions in `README.md` and `create.html` were corrected to match
+(they still described branch-root Pages). Uncommitted, waiting on Ryan: `create.html` is a live
+page and pushing redeploys, so the live site carries the old copy until then.
 
 **Slice 1 of 4 is committed** on `adopt-template` as `981add8` (not pushed): conventions,
 CI, licence, ADRs 0003–0019 (0008, 0009, 0011 accepted by Ryan; ADR-0002 superseded).
@@ -34,9 +39,9 @@ straight through; README carries an "early development — breaking changes at a
 **Next:**
 1. Ryan: `pnpm install`, restart the dev server as `pnpm dev` (still `0.0.0.0:8080`), click
    through the unverified list above — now including a no-choice show playing through (load the
-   ukulele file in Studio → Play ▶).
+   ukulele file in Studio → Play ▶). Also give `create.html` a read on the live site: its
+   deploy step was rewritten 2026-09-15 and hasn't been looked at in a browser.
 2. Start slice 3 (event-log core, IndexedDB, `localStorage` migration).
-3. Cutover to Actions-deployed Pages (ADR-0006) whenever Ryan wants the branch live.
 
 **Why this started:** Ryan wanted to load previously exported single-show configs (e.g.
 `most-useful-music-theory-for-ukulele 3.json`). Today: home-page **Import All** rejects them
@@ -93,9 +98,10 @@ Not yet: the event log reducer and import idempotence — slice 3 (ADR-0004).
    Editor serializers (they differ today, preserved deliberately in slice 2).
 4. **Slice 4 — the feature.** Single-show config import through Import All (multi-file) and
    Studio, per ADR-0011. Then retest with the ukulele file.
-5. **Cutover** (ADR-0006, ordered, on the live site): merge to `main`, set `DEPLOY_PAGES=true`,
-   switch Pages source to GitHub Actions, check a `player.html?config=…#node` link. Rewrite
-   `README.md` and `create.html` deploy instructions in the same change.
+5. **Cutover** — done 2026-09-14 (see Status); its documentation debt cleared 2026-09-15.
+   `README.md`'s "Deploy" section and `create.html` step 2 now say Pages source = GitHub Actions
+   plus a `DEPLOY_PAGES=true` repository variable, and the "no build step" copy in both files was
+   reworded — see [journal 2026-09-15](journal/2026-09-15-deploy-instructions-catch-up.md).
 
 Found in slice 2, not yet scheduled:
 - **Editor marks a freshly loaded file as unsaved** (`loadConfig` → `structural()` sets `dirty`),
@@ -146,3 +152,7 @@ and [`reviews/`](reviews/README.md) for stance reviews._
 - **2026-09-14 (3)** — Ryan accepted ADR-0020/0021, decided no-choice nodes continue (ADR-0022,
   implemented in `src/core/routing.ts`), asked for the breaking-changes README warning, and chose
   to commit and push slice 2 before the browser pass.
+- **2026-09-14 (4)** — Cutover: `main` fast-forwarded to `adopt-template` (`3a51695`), Ryan set
+  `DEPLOY_PAGES` and the Pages source (the settings change was blocked for the agent as a
+  production deploy), pushed to GitHub with `gr push --remote origin`, CI + deploy green, live
+  smoke test 16/16.

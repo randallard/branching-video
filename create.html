@@ -34,6 +34,8 @@
     content: ""; position: absolute; left: 17px; top: 40px; bottom: 2px; width: 2px; background: var(--border);
   }
   ol.steps h3 { margin: 4px 0 6px; font-size: 18px; }
+  ol.steps ol { margin: 6px 0 10px; padding-left: 20px; color: #c4cbd6; }
+  ol.steps ol li { margin: 0 0 6px; }
   ol.steps p { margin: 0 0 8px; color: #c4cbd6; }
   code, kbd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13.5px; }
   code { background: var(--panel-2); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; }
@@ -55,7 +57,7 @@
     <h1>Make your own branching video</h1>
     <p class="lede">
       Fork the repo, host it free on GitHub Pages, and build interactive videos with the visual editor —
-      no platform, no monthly fee, no build step.
+      no platform, no monthly fee, no server to run.
     </p>
 
     <ol class="steps">
@@ -66,7 +68,12 @@
 
       <li>
         <h3>Turn on GitHub Pages</h3>
-        <p>In your fork: <strong>Settings → Pages → Deploy from a branch → <code>main</code> / <code>/ (root)</code></strong>. Your site goes live at <code>https://&lt;you&gt;.github.io/branching-video/</code> and redeploys on every push.</p>
+        <p>The site is built by CI and published from that build, not from the branch root. Two one-time settings in your fork:</p>
+        <ol>
+          <li><strong>Settings → Pages → Build and deployment → Source → <code>GitHub Actions</code></strong> (not &ldquo;Deploy from a branch&rdquo;).</li>
+          <li><strong>Settings → Secrets and variables → Actions → Variables → New repository variable</strong> → name <code>DEPLOY_PAGES</code>, value <code>true</code>.</li>
+        </ol>
+        <p>Your site goes live at <code>https://&lt;you&gt;.github.io/branching-video/</code> and rebuilds on every push to <code>main</code>.</p>
       </li>
 
       <li>
@@ -97,7 +104,7 @@ pnpm dev        # serves on http://localhost:8080</code></pre>
 
       <li>
         <h3>Commit &amp; push</h3>
-        <p>Push your <code>public/live/</code> configs. GitHub Pages rebuilds automatically:</p>
+        <p>Push your <code>public/live/</code> configs. CI rebuilds the site and redeploys Pages automatically:</p>
         <pre><code>git add public/live/ &amp;&amp; git commit -m "Add my show"
 git push</code></pre>
         <p>Your show is now live at <code>player.html?config=live/your-show.json</code> and listed on your home page.</p>

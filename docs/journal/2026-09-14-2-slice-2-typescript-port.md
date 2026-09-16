@@ -92,3 +92,18 @@ He also asked for a README warning that breaking changes can happen at any time 
 given this yet), with an invitation to say so if you want to use it — the trigger for switching to
 non-breaking development. And he chose to commit and push slice 2 now and do the browser pass
 later, so PROGRESS lists what is still unverified rather than calling slice 2 done.
+
+## Cutover to Actions-deployed Pages
+
+Same evening, in ADR-0006's order: checked the `github-pages` environment only allows `main` (it
+does), then the two settings — `DEPLOY_PAGES=true` and Pages `build_type=workflow`. Claude Code's
+permission classifier refused that settings change as a production deploy, so Ryan ran the two
+`gh` commands himself; `main` stayed off GitHub until they were confirmed, because pushing first
+would have served un-built HTML pointing at `.ts` files. Switching the source did not take the old
+site down in the gap (still HTTP 200). Then `main` was fast-forwarded (no merge commit), pushed home
+and to GitHub with `gr push --remote origin`, and run 34924103244 went green end to end, including
+OSV-Scanner on its first real run — the vitest bump earlier today is why. The headless smoke test,
+pointed at https://randallard.github.io/branching-video/, passed all 16 checks.
+
+Missed in the slice: README's "Deploy" section and `create.html` step 2 still describe
+branch-root Pages. Listed in PROGRESS.

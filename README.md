@@ -7,7 +7,7 @@
 
 A lightweight, self-hosted interactive video player that supports non-linear storytelling — deep dives, asides, and viewer-controlled paths — built on YouTube's free infrastructure.
 
-No monthly platform fees. No vendor lock-in. Just a JSON config, a single HTML file, and free static hosting.
+No monthly platform fees. No vendor lock-in. Just a JSON config, a handful of static pages, and free static hosting.
 
 ---
 
@@ -93,11 +93,22 @@ Two ways:
 
 ### 3. Deploy
 
-Push to GitHub and enable **GitHub Pages**: Settings → Pages → "Deploy from a branch" → `main` / root. Free, auto-redeploys on every push.
+The site is built by CI and published from the build artifact, **not** from the branch root —
+see [ADR-0006](docs/adr/0006-pages-deploy-from-ci-build-artifact.md). Two one-time settings on
+your fork:
+
+1. **Settings → Pages → Build and deployment → Source → "GitHub Actions"** (not "Deploy from a branch").
+2. **Settings → Secrets and variables → Actions → Variables → New repository variable** → name
+   `DEPLOY_PAGES`, value `true`.
+
+After that, every push to `main` runs `pnpm build` in CI and deploys `dist/` to Pages. The build
+uses a relative base ([ADR-0020](docs/adr/0020-vite-multi-page-build-with-relative-base.md)), so
+it works under `/<repo>/` on any fork with no extra configuration.
 
 Your player URL will be `https://<user>.github.io/<repo>/player.html#intro`.
 
-(Netlify also works if you want a custom domain with less DNS hassle — same idea, point it at the repo.)
+(Netlify also works if you want a custom domain with less DNS hassle — point it at the repo with
+build command `pnpm build` and publish directory `dist`.)
 
 ### 4. Link from YouTube
 
@@ -232,7 +243,7 @@ For a slice of the master video:
 2. Add a new node to your show's config with those `start`/`end` values
 3. Wire it into the existing graph via another node's `choices`
 4. `pnpm validate public/live/your-show.json` to catch typos
-5. Push to GitHub → Pages redeploys automatically
+5. Push to GitHub → CI builds the site and redeploys Pages automatically
 
 For a brand-new deep dive (separate upload):
 
@@ -241,7 +252,8 @@ For a brand-new deep dive (separate upload):
 3. Set `isAside: true` and `returnTo` so it auto-routes back to the main line
 4. Wire it as a `target` in the main-line node where you want the off-ramp
 
-No rebuilding. No compile step. No platform dashboard to navigate.
+No platform dashboard to navigate — adding a show is a JSON file and a push, and CI runs the
+build and the redeploy for you.
 
 ---
 
