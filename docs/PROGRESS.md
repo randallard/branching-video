@@ -48,7 +48,7 @@ straight through; README carries an "early development — breaking changes at a
    ukulele file in Studio → Play ▶). Also give `create.html` a read on the live site: its
    deploy step was rewritten 2026-09-15 and, while the corrected copy is confirmed live, no one
    has yet read it as a person following the instructions.
-2. Slice 3b — the wiring (see worklist item 3). Slice 3a landed 2026-09-15.
+2. Slice 3b **part 3** — the page wiring (see worklist item 3). Parts 1 and 2 landed 2026-09-15.
    It does not block the browser pass: the pass covers slice 2, which is already live, and a
    clean read of current behaviour is the baseline 3b changes against.
 
@@ -109,7 +109,19 @@ Added in slice 3a (`order.test.ts`, `canonical.test.ts`, `reduce.test.ts`, `bund
 - Removal beats a later field set; a re-add lifts the removal and edits apply again; a snapshot
   clears the removal record; one show's removals don't touch another's.
 
-Not yet: the diff emitter — slice 3b, since it doesn't exist yet.
+Added in slice 3b parts 1–2 (`diff.test.ts`, `shell/draft-store.test.ts`, more in
+`reduce.test.ts`):
+
+- Any config round-trips through a diff, and so does an edit applied on top of an existing show;
+  an unchanged save emits nothing, which is what makes it safe on every autosave.
+- A rename emits one field-set and keeps the node key; a reorder emits exactly one event.
+- Two devices editing different fields of the same node keep both — end to end, through export and
+  import, not just at the reducer.
+- Re-importing the same bundle or the same config file adds nothing.
+- An ADR-0024 collision is reported with the node as it stood, and both answers settle it.
+
+Not yet: nothing outstanding in the core. The remaining provability work is whatever 3b.3's page
+wiring turns out to need.
 
 ## Worklist
 
@@ -125,12 +137,23 @@ Not yet: the diff emitter — slice 3b, since it doesn't exist yet.
      snapshots), `shell/event-store.ts` (IndexedDB, idempotent by event id, in-memory fallback).
      Additive: nothing imports it, built page hashes unchanged, app behaviour identical.
      Tests 30 → 71. See [journal 2026-09-15-3](journal/2026-09-15-3-slice-3a-event-log-core.md).
-   - **3b — the wiring. Next, and where the visible risk is.** Emit diffs (not snapshots) from
-     Studio and the Editor; run the one-time `localStorage` migration on first load
-     (`migrateLocalDrafts` is written and tested but nothing calls it); point Export All /
-     Import All at event bundles; the ADR-0011 update-or-add prompt for single-show files; unify
-     the Studio and Editor serializers (they differ today, preserved deliberately in slice 2);
-     property tests for the diff emitter.
+   - **3b — the wiring. Split in three; parts 1 and 2 are done and pushed, part 3 is next.**
+     `editor.ts` is 984 lines, Studio 654, the home page 294, so rewiring all of it in one commit
+     would not have been reviewable.
+     - **3b.1 — collision detection + diff emitter. Done.** `reduce` returns the ADR-0024
+       collisions it noticed; `core/diff.ts` emits one event per changed field, against a
+       `WorkingShow` (config + aligned key list) so a rename stays a rename. Order assignment
+       keeps the longest ascending run and rewrites only the rest.
+     - **3b.2 — the draft store. Done.** `shell/draft-store.ts`: list/open/save/create/remove,
+       export/import, collisions, and the first-load migration. The seam the pages move onto.
+       Found and fixed two ordering bugs — see the journal.
+     - **3b.3 — the page wiring. NEXT, and where behaviour actually changes.** Home page
+       (event-bundle Export/Import All + ADR-0011 update-or-add for single-show config files —
+       the feature this migration was for); Studio (resume list, autosave, "Import config JSON…"
+       through the same path); Editor (load/save through the store); the ADR-0024 notice with its
+       two answers; unify the Studio and Editor serializers. `setResume` moves from slug to
+       `showId` (ADR-0009), and `classifyImport`'s conflict path retires with the `bvp-backup`
+       bundle it served.
    - **Both decisions 3a had to make are now ADRs (2026-09-15), so 3b starts with them settled.**
      - [ADR-0025](adr/0025-snapshot-node-keys-derived-from-node-id.md) — snapshot node keys come
        from the node's `id`, falling back to a content hash (not position) for duplicate or blank
@@ -254,3 +277,9 @@ and [`reviews/`](reviews/README.md) for stance reviews._
   in the event would give two devices the same event id with different payloads. `snapshotNodeKeys`
   hardened accordingly; the two new tests fail against the old positional rule. No open questions
   outstanding.
+- **2026-09-15 (6)** — Slice 3b parts 1–2: collision detection, the diff emitter and the draft
+  store, all green and still additive (page hashes unchanged). Tests 71 → 103. Two ordering bugs
+  found by the tests: `toConfig` aliased the reduced state so in-place edits diffed to nothing, and
+  event order was decided by a random tiebreak because a whole save landed in one millisecond. See
+  [journal 2026-09-15-4](journal/2026-09-15-4-slice-3b-core-and-store.md). Part 3, the page
+  wiring, is next.
