@@ -143,6 +143,57 @@ describe("reduce", () => {
       expect(findShow(reduce(events), "s")?.nodes).toEqual([]);
     });
 
+    it("a re-add after a removal brings the node back", () => {
+      // Removal beats later *field sets* (ADR-0008), but adding the node again is a deliberate
+      // act, not a stray edit, so it lifts the removal. Decided here, not in the ADR.
+      const events = [
+        {
+          ...base("add", "2026-09-01T00:00:00.000Z"),
+          kind: "node-added",
+          showId: "s",
+          nodeKey: "k",
+          node: { id: "intro", title: "Intro", choices: [] },
+          order: "V",
+        },
+        { ...base("rm", "2026-09-02T00:00:00.000Z"), kind: "node-removed", showId: "s", nodeKey: "k" },
+        {
+          ...base("again", "2026-09-03T00:00:00.000Z"),
+          kind: "node-added",
+          showId: "s",
+          nodeKey: "k",
+          node: { id: "intro", title: "Back again", choices: [] },
+          order: "V",
+        },
+        {
+          ...base("edit", "2026-09-04T00:00:00.000Z"),
+          kind: "node-field-set",
+          showId: "s",
+          nodeKey: "k",
+          field: "title",
+          value: "And editable",
+        },
+      ] as ShowEvent[];
+      const nodes = findShow(reduce(events), "s")?.nodes;
+      expect(nodes).toHaveLength(1);
+      // Edits after the re-add apply again — the removal is fully lifted, not just paused.
+      expect(nodes?.[0]?.node.title).toBe("And editable");
+    });
+
+    it("keeps one show's removals out of another's", () => {
+      const events = [
+        {
+          ...base("add", "2026-09-01T00:00:00.000Z"),
+          kind: "node-added",
+          showId: "other",
+          nodeKey: "k",
+          node: { id: "intro", title: "Untouched", choices: [] },
+          order: "V",
+        },
+        { ...base("rm", "2026-09-02T00:00:00.000Z"), kind: "node-removed", showId: "s", nodeKey: "k" },
+      ] as ShowEvent[];
+      expect(findShow(reduce(events), "other")?.nodes).toHaveLength(1);
+    });
+
     it("a later snapshot brings the show back wholesale", () => {
       const config = { title: "T", startNode: "intro", nodes: [{ id: "intro", title: "I", choices: [] }] };
       const events = [

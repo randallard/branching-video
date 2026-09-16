@@ -106,6 +106,8 @@ Added in slice 3a (`order.test.ts`, `canonical.test.ts`, `reduce.test.ts`, `bund
 - Bundles round-trip and serialize deterministically; union is commutative across two devices.
 - Order keys stay strictly ordered and distinct under 500 repeated insertions at the same spot.
 - A config round-trips exactly through a snapshot; snapshot node keys are deterministic.
+- Removal beats a later field set; a re-add lifts the removal and edits apply again; a snapshot
+  clears the removal record; one show's removals don't touch another's.
 
 Not yet: the diff emitter — slice 3b, since it doesn't exist yet.
 
@@ -129,6 +131,20 @@ Not yet: the diff emitter — slice 3b, since it doesn't exist yet.
      Import All at event bundles; the ADR-0011 update-or-add prompt for single-show files; unify
      the Studio and Editor serializers (they differ today, preserved deliberately in slice 2);
      property tests for the diff emitter.
+   - **Two decisions 3a had to make that no ADR covers — Ryan's call, and 3b is when they stop
+     being theoretical.** Both are implemented and tested, so nothing is blocked; what's missing
+     is the decision record.
+     1. **Where snapshot node keys come from.** A `show-snapshot` arrives as a plain config whose
+        nodes have no `nodeKey`, but later per-field edits must target those nodes, and two
+        devices importing the same file must derive the same keys or the edits land on nothing.
+        3a uses `n:<node.id>`, disambiguated by position when ids repeat or are blank
+        (`snapshotNodeKeys`). ADR-0009 rules node ids out as *identity*, not as a derivation, so
+        this doesn't contradict it — but it isn't written down either. 3b's diff emitter has to
+        produce keys that line up with this, which is what makes it worth settling.
+     2. **What `node-removed` means beyond ADR-0008's "removal wins over later field sets."** 3a
+        decided a later `node-added` on the same key re-creates the node (a re-add is deliberate)
+        and a `show-snapshot` clears the removal record entirely (it's the whole show). 3b's
+        Studio delete-node flow is the first thing to exercise either.
 4. **Slice 4 — the feature.** Single-show config import through Import All (multi-file) and
    Studio, per ADR-0011. Then retest with the ukulele file.
 5. **Cutover** — done 2026-09-14 (see Status); its documentation debt cleared and shipped
