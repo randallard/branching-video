@@ -172,10 +172,25 @@ Carried over, not yet scheduled (from `notes.txt`):
 
 ## Open questions
 
-- Same-field edits on two devices resolve to the later clock under ADR-0008; the losing value
-  stays in the log but there's no history view to recover it. Build one, or accept?
-- Retired with ADR-0002 (superseded by 0008), kept for the record: the `-imported` copy
-  accumulation and `JSON.stringify` conflict detection.
+- **Where snapshot node keys come from** — see slice 3b in the worklist. Needs an ADR.
+- **What `node-removed` means beyond "removal wins over later field sets"** — same. Needs an ADR.
+
+## Answered, needing an ADR
+
+- **Same-field edits on two devices resolve to the later clock (ADR-0008), and the losing value
+  stays in the log with nothing to show it.** Asked whether to build a history view or accept the
+  loss; **Ryan chose to build one (2026-09-15).** Not yet written up, and it can't start before
+  3b — until Studio and the Editor emit per-field events there is no superseded value to recover.
+  Open inside the decision: whether it's a per-field "what else has this been" affordance, a
+  per-show "what changed and when" log, or both.
+
+## Closed, kept for the record
+
+- The `-imported` copy accumulation and `JSON.stringify` conflict detection were
+  [ADR-0002](adr/0002-import-conflict-resolution-per-draft-choice.md)'s problems. ADR-0002 is
+  superseded by [0008](adr/0008-edit-level-events-per-field-last-writer-wins.md), so neither
+  applies any more — kept here so a reader who remembers them knows where they went, not as
+  anything outstanding.
 
 ---
 
