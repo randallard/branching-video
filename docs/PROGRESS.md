@@ -48,17 +48,9 @@ straight through; README carries an "early development — breaking changes at a
    ukulele file in Studio → Play ▶). Also give `create.html` a read on the live site: its
    deploy step was rewritten 2026-09-15 and, while the corrected copy is confirmed live, no one
    has yet read it as a person following the instructions.
-2. Start slice 3 (event-log core, IndexedDB, `localStorage` migration) — the next migration
-   slice, and the largest. Shape, from ADRs 0007–0009 and 0011 with
-   [cycle-in](https://github.com/randallard/cycle-in) as the reference implementation:
-   `src/core/events.ts` (edit-level events, per-field last-writer-wins) and `reduce.ts`, show
-   ids generated not slugged, `bundle.ts` for event-bundle backups, snapshot import with
-   content-hash ids, an IndexedDB store in `src/shell/`, and a one-time `localStorage`
-   migration. Also folds in unifying the Studio and Editor serializers (they differ today,
-   preserved deliberately in slice 2) and the carried-over single-choice auto-advance, which
-   belongs in the routing core rather than the old JS. Adds the reducer and import-idempotence
-   property tests that ADR-0004 still owes.
-   Slice 3 does not block Ryan's browser pass — the pass covers slice 2, which is already live.
+2. Slice 3b — the wiring (see worklist item 3). Slice 3a landed 2026-09-15.
+   It does not block the browser pass: the pass covers slice 2, which is already live, and a
+   clean read of current behaviour is the baseline 3b changes against.
 
 **Why this started:** Ryan wanted to load previously exported single-show configs (e.g.
 `most-useful-music-theory-for-ukulele 3.json`). Today: home-page **Import All** rejects them
@@ -101,7 +93,21 @@ Property tests (`fast-check`) on `src/core/`, run by `pnpm test`:
   fires from the last node; choices show exactly when a node has them; the validator's
   continue rule agrees with the player's.
 
-Not yet: the event log reducer and import idempotence — slice 3 (ADR-0004).
+Added in slice 3a (`order.test.ts`, `canonical.test.ts`, `reduce.test.ts`, `bundle.test.ts`,
+`migrate.test.ts`, `shell/event-store.test.ts`):
+
+- **`reduce` is a function of the event set** — `reduce(events) === reduce(reversed)`, unchanged by
+  duplicates and by re-importing a subset. This is what makes a two-device merge a plain union.
+- Two devices editing *different* fields both survive; the same field resolves to the later write;
+  an exact timestamp tie breaks by event id, deterministically.
+- Migration is idempotent: the snapshot id is a content hash excluding the clock, so the same
+  content imported twice is a no-op, and an old `bvp-backup` lands on the same shows as the drafts
+  it came from.
+- Bundles round-trip and serialize deterministically; union is commutative across two devices.
+- Order keys stay strictly ordered and distinct under 500 repeated insertions at the same spot.
+- A config round-trips exactly through a snapshot; snapshot node keys are deterministic.
+
+Not yet: the diff emitter — slice 3b, since it doesn't exist yet.
 
 ## Worklist
 
@@ -109,10 +115,20 @@ Not yet: the event log reducer and import idempotence — slice 3 (ADR-0004).
 2. **Slice 2 — build + typed pages.** Committed and live; browser pass still owed. Layout: `src/core` (config model, text helpers, validate,
    serializers, manifest, legacy backup), `src/shell` (youtube, drafts, files, shows), `src/ui/dom.ts`,
    `src/pages/*.ts`; `tools/validate-config.ts` runs under Node type stripping.
-3. **Slice 3 — event-log core.** Events (ADR-0008), show ids (0009), reducer, event bundle,
-   snapshot import with content-hash ids (0011), IndexedDB store, one-time `localStorage`
-   migration; unify the Studio and
-   Editor serializers (they differ today, preserved deliberately in slice 2).
+3. **Slice 3 — event-log core.** Split in two.
+   - **3a — the pure core and the store. Done, committed (`4b7f39c`), pushed.** `core/order.ts`
+     (fractional order keys), `core/canonical.ts` (canonical JSON + content hash),
+     `core/events.ts` (envelope + ADR-0008 kinds), `core/reduce.ts` (fold the event set),
+     `core/bundle.ts` (event bundle), `core/migrate.ts` (legacy drafts/backups/config files as
+     snapshots), `shell/event-store.ts` (IndexedDB, idempotent by event id, in-memory fallback).
+     Additive: nothing imports it, built page hashes unchanged, app behaviour identical.
+     Tests 30 → 71. See [journal 2026-09-15-3](journal/2026-09-15-3-slice-3a-event-log-core.md).
+   - **3b — the wiring. Next, and where the visible risk is.** Emit diffs (not snapshots) from
+     Studio and the Editor; run the one-time `localStorage` migration on first load
+     (`migrateLocalDrafts` is written and tested but nothing calls it); point Export All /
+     Import All at event bundles; the ADR-0011 update-or-add prompt for single-show files; unify
+     the Studio and Editor serializers (they differ today, preserved deliberately in slice 2);
+     property tests for the diff emitter.
 4. **Slice 4 — the feature.** Single-show config import through Import All (multi-file) and
    Studio, per ADR-0011. Then retest with the ukulele file.
 5. **Cutover** — done 2026-09-14 (see Status); its documentation debt cleared and shipped
@@ -186,3 +202,6 @@ and [`reviews/`](reviews/README.md) for stance reviews._
   the authoring rule (finish with a node that reaches the end of the video, or give it an
   `endScreen`). README + `create.html` updated, no code change. See
   [journal 2026-09-15-2](journal/2026-09-15-2-browser-pass-last-node-wrap.md).
+- **2026-09-15 (3)** — Slice 3a: the event-log core and store, additive and green (`4b7f39c`),
+  tests 30 → 71. Slice 3b (the page wiring) is next. See
+  [journal 2026-09-15-3](journal/2026-09-15-3-slice-3a-event-log-core.md).
