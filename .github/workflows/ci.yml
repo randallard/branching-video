@@ -157,13 +157,52 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      # Name the subject of the SBOM. Without this `metadata.component` is
+      # {"type":"file","name":"."} and the document never says what it describes,
+      # which makes it close to useless to anyone who receives it on its own.
+      # Syft reads these two from the environment.
+      - name: identify the SBOM subject
+        if: needs.detect.outputs.ts == 'true'
+        run: |
+          set -euo pipefail
+          {
+            echo "SYFT_SOURCE_NAME=$(jq -er .name package.json)"
+            echo "SYFT_SOURCE_VERSION=$(jq -er .version package.json)"
+          } >> "$GITHUB_ENV"
       # Syft scans the project directly — a single static binary, no npm or cargo
       # dependency of its own, so it sidesteps package-manager layout problems.
+      #
+      # This catalogs `pnpm-lock.yaml`, NOT `node_modules`, and that is deliberate:
+      # the lockfile is the complete, platform-independent, reproducible set (it
+      # includes the native binaries for every OS, which a Linux install omits).
+      # The cost is that the lockfile carries no licence metadata, so no component
+      # here has a `licenses` field. Do not "fix" that by installing first and
+      # enabling `javascript-package-cataloger` — measured 2026-09-17, that yields
+      # 548 components for 285 packages (every one duplicated, once per cataloger)
+      # and picks up whatever stale trees are lying in the pnpm store. The licence
+      # control is ADR-0017's allowlist in the `ts supply chain` job, which reads a
+      # real install and gates on it; this document is an inventory, not a licence
+      # report.
       - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           path: .
           format: cyclonedx-json
           output-file: sbom.cdx.json
+      # A cataloger that silently stops matching produces an empty SBOM, and an
+      # empty SBOM uploads and goes green — the job would keep reporting success
+      # while the artifact became worthless. 50 is a floor, not a target: the real
+      # count is in the hundreds, and anything near this number means something
+      # stopped working.
+      - name: SBOM is not empty
+        run: |
+          set -euo pipefail
+          count=$(jq '.components | length' sbom.cdx.json)
+          subject=$(jq -r '.metadata.component | "\(.name)@\(.version // "?")"' sbom.cdx.json)
+          echo "SBOM subject: $subject — $count components"
+          if [ "$count" -lt 50 ]; then
+            echo "::error::SBOM has only $count components; a cataloger has probably stopped matching."
+            exit 1
+          fi
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: sbom
@@ -180,13 +219,19 @@ jobs:
       contents: read
       security-events: write
       actions: read
-    # Reusable workflow — pinned by tag because `uses:` on a reusable workflow
-    # resolves a ref in that repo the same way; bump deliberately.
+    # A reusable workflow, and `uses:` resolves a ref in that repo the same way an
+    # action does — so ADR-0018 applies here too and it is pinned to a SHA, with
+    # the version in the trailing comment. Bump deliberately.
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
 
   deploy:
     name: deploy to Pages
-    needs: [ts-gates, ts-supply-chain]
+    # `osv-scan` is in here because after ADR-0006 the job that builds `dist/` is
+    # the job that publishes what viewers load — the same reasoning ADR-0018 gives
+    # for pinning actions. A red scanner must not be able to ship. (`osv-scan`
+    # skips itself only when there is no dependency manifest at all, which cannot
+    # be true of a project deploying a built site.)
+    needs: [ts-gates, ts-supply-chain, osv-scan]
     # Opt in per project: Settings → Variables → DEPLOY_PAGES = true.
     # Remember `base` must match the repo name or every asset 404s.
     if: vars.DEPLOY_PAGES == 'true' && github.ref == 'refs/heads/main'
