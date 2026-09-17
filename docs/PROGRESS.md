@@ -1,6 +1,6 @@
 # Progress & Status
 
-_Last updated: 2026-09-15_
+_Last updated: 2026-09-17_
 
 ## Status / next
 
@@ -42,6 +42,17 @@ Editor's mobile drawer and Chromium Save As. See [journal 2026-09-14-2](journal/
 straight through; README carries an "early development — breaking changes at any time" warning
 (no one has been handed this yet; switch to non-breaking development if someone asks to use it).
 
+**2026-09-17 — supply-chain audit.** All eight supply-chain ADRs (0012–0018) verified implemented
+and green against live config and a real CI run; `pnpm audit` clean, 285/285 signatures verified,
+licence allowlist exit 0, all 22 action `uses:` SHA-pinned. Three fixes committed (`40272dd`): the SBOM now
+names its subject (`branching-video@0.1.0`, was `{"type":"file","name":"."}`), a floor of 50
+components fails the job if a cataloger stops matching, and **`osv-scan` now gates the deploy** — a
+red scan used to publish to Pages anyway. The SBOM's empty `licenses` fields turn out to be correct
+and are now commented as such: cataloging `node_modules` instead doubles the component count to 548
+and picks up stale store trees. The real gap is that nothing in 0012–0018 covers the one script that
+reaches a viewer — [ADR-0026](adr/0026-content-security-policy-on-the-player-pages.md) proposes a CSP
+and is **waiting on Ryan**. See [journal 2026-09-17](journal/2026-09-17-supply-chain-audit.md).
+
 **Next:**
 1. Ryan: `pnpm install`, restart the dev server as `pnpm dev` (still `0.0.0.0:8080`), click
    through the unverified list above — now including a no-choice show playing through (load the
@@ -51,6 +62,11 @@ straight through; README carries an "early development — breaking changes at a
 2. Slice 3b **part 3** — the page wiring (see worklist item 3). Parts 1 and 2 landed 2026-09-15.
    It does not block the browser pass: the pass covers slice 2, which is already live, and a
    clean read of current behaviour is the baseline 3b changes against.
+3. Ryan: decide [ADR-0026](adr/0026-content-security-policy-on-the-player-pages.md) (CSP). It
+   changes what ships to viewers, so it is not mine to accept. Accepting it is a small change — a
+   meta tag on five pages plus a smoke-test check for console violations.
+4. Ryan: branch protection on `main` (taken on 2026-09-17), and confirm the Renovate app is
+   actually installed — no PR has ever been opened on the repo.
 
 **Why this started:** Ryan wanted to load previously exported single-show configs (e.g.
 `most-useful-music-theory-for-ukulele 3.json`). Today: home-page **Import All** rejects them
@@ -178,6 +194,12 @@ wiring turns out to need.
    plus a `DEPLOY_PAGES=true` repository variable, and the "no build step" copy in both files was
    reworded — see [journal 2026-09-15](journal/2026-09-15-deploy-instructions-catch-up.md).
 
+6. **Supply-chain audit** — done 2026-09-17. ADRs 0012–0018 all implemented; SBOM subject naming,
+   the non-empty assertion and the `osv-scan` deploy gate fixed in `ci.yml` (`40272dd`). Outstanding from it:
+   ADR-0026 (CSP) awaiting Ryan; branch protection (Ryan); Renovate installation unverified.
+   ADR-0012's body names a pnpm field that doesn't exist (`allowBuilds`; the real one is
+   `onlyBuiltDependencies`) — the ADR is immutable, so the correction lives in the journal.
+
 Found in slice 2, not yet scheduled:
 - **No validator warning for a show that stops short of its video.** Raised 2026-09-15 and not
   chosen; it would need the source video's duration, which the validator has no way to get
@@ -283,3 +305,12 @@ and [`reviews/`](reviews/README.md) for stance reviews._
   event order was decided by a random tiebreak because a whole save landed in one millisecond. See
   [journal 2026-09-15-4](journal/2026-09-15-4-slice-3b-core-and-store.md). Part 3, the page
   wiring, is next.
+- **2026-09-17** — Audited the supply-chain posture at Ryan's request. All eight ADRs hold. The SBOM
+  is complete (285 npm components matching the lockfile exactly) but didn't name its subject and
+  nothing asserted it was non-empty; both fixed. Its missing licence data is correct — cataloging
+  `node_modules` yields 548 components for 285 packages and surfaces stale `vitest@4.1.8` trees — and
+  the reasoning is now a comment in `ci.yml`. `osv-scan` added to the deploy's `needs`. Found that
+  nothing in 0012–0018 covers `https://www.youtube.com/iframe_api`, the only third-party code that
+  reaches a viewer; [ADR-0026](adr/0026-content-security-policy-on-the-player-pages.md) proposes a
+  CSP and is Proposed, not Accepted. See
+  [journal 2026-09-17](journal/2026-09-17-supply-chain-audit.md).
