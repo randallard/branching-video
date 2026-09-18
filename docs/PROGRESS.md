@@ -51,7 +51,7 @@ red scan used to publish to Pages anyway. The SBOM's empty `licenses` fields tur
 and are now commented as such: cataloging `node_modules` instead doubles the component count to 548
 and picks up stale store trees. The real gap is that nothing in 0012–0018 covers the one script that
 reaches a viewer — [ADR-0026](adr/0026-content-security-policy-on-the-player-pages.md) proposes a CSP
-and is **waiting on Ryan**. See [journal 2026-09-17](journal/2026-09-17-supply-chain-audit.md).
+(accepted and shipped 2026-09-18, see below). See [journal 2026-09-17](journal/2026-09-17-supply-chain-audit.md).
 
 **2026-09-18 — branch protection set; Renovate still unconfirmed.** `main` now requires a pull
 request before merging (0 required approvals — Ryan is the only reviewer, so requiring one would
@@ -60,7 +60,7 @@ deadlock every PR) plus the checks that actually run on a PR: `detect languages`
 never runs on a PR). `enforce_admins: false`, so Ryan can still push directly to `main` if needed;
 this binds Renovate and any future collaborator, not him. **This changes the workflow**: every
 prior commit on this repo was a direct push to `main`, and that path is now closed unless he uses
-the admin bypass. Force-push and branch deletion are blocked outright. Renovate's installation is
+the admin bypass. Force-push and branch deletion are blocked outright. Renovate's installation
 was still unconfirmed via API at the time (the endpoints that would say so directly aren't
 reachable with this token), but four days post-adoption there was no Dependency Dashboard issue
 (which `config:recommended` turns on unconditionally), no PRs, no bot activity in repo events, and
@@ -69,7 +69,19 @@ same day and confirmed it was missing, then **installed it the same day** — th
 defaulted to a paid tier, which he caught and switched to free before confirming. No Dependency
 Dashboard issue or PR yet as of this update; that's expected on a first run and is worth checking
 again in a day or two. See
-[journal 2026-09-18](journal/2026-09-18-branch-protection-and-renovate-check.md).
+[journal 2026-09-18](journal/2026-09-18-branch-protection-and-renovate-check.md). **Update the same
+day: Renovate is confirmed working** — it opened PR #3 (`actions/checkout` digest bump), which Ryan
+merged manually (automerge is off by Renovate's own default config). That closes the "check in a
+day or two" item above.
+
+**2026-09-18 (2) — ADR-0026 accepted and shipped.** Ryan accepted the CSP proposal and asked for it
+done directly rather than deciding-then-handing-off. Exactly the small change estimated: one
+`<meta http-equiv="Content-Security-Policy">` tag, identical content, on all five Vite entry pages.
+`pnpm build` clean; verified with a throwaway headless-Chromium pass (not committed — see the
+smoke-test note in [journal 2026-09-14 (2)](journal/2026-09-14-2-slice-2-typescript-port.md))
+against a `vite preview` on a spare port, including `player.html` actually loading a real show and
+exercising the YouTube IFrame API against `www.youtube.com` — zero CSP violations. ADR-0026 is now
+Accepted. See [journal 2026-09-18 (2)](journal/2026-09-18-2-csp-accepted-and-shipped.md).
 
 **Next:**
 1. Ryan: `pnpm install`, restart the dev server as `pnpm dev` (still `0.0.0.0:8080`), click
@@ -80,14 +92,10 @@ again in a day or two. See
 2. Slice 3b **part 3** — the page wiring (see worklist item 3). Parts 1 and 2 landed 2026-09-15.
    It does not block the browser pass: the pass covers slice 2, which is already live, and a
    clean read of current behaviour is the baseline 3b changes against.
-3. Ryan: decide [ADR-0026](adr/0026-content-security-policy-on-the-player-pages.md) (CSP). It
-   changes what ships to viewers, so it is not mine to accept. Accepting it is a small change — a
-   meta tag on five pages plus a smoke-test check for console violations.
-4. Renovate is now installed (2026-09-18, free tier). Check in a day or two that it actually
-   opened a Dependency Dashboard issue or a first PR — nothing had shown up yet as of install.
-   Branch protection is done (2026-09-18); note the new PR-required workflow on `main` going
-   forward — a direct `git push` to `main` will be rejected unless the admin bypass is used, and
-   Renovate's PRs will land through that same required-checks path.
+3. ~~Ryan: decide ADR-0026 (CSP).~~ Done 2026-09-18 — accepted and shipped, see above.
+4. ~~Branch protection~~ done 2026-09-18. ~~Renovate installation~~ confirmed installed and
+   working 2026-09-18 (PR #3 merged). Note the new PR-required workflow on `main` going forward —
+   a direct `git push` to `main` will be rejected unless the admin bypass is used.
 
 **Why this started:** Ryan wanted to load previously exported single-show configs (e.g.
 `most-useful-music-theory-for-ukulele 3.json`). Today: home-page **Import All** rejects them
@@ -216,9 +224,10 @@ wiring turns out to need.
    reworded — see [journal 2026-09-15](journal/2026-09-15-deploy-instructions-catch-up.md).
 
 6. **Supply-chain audit** — done 2026-09-17. ADRs 0012–0018 all implemented; SBOM subject naming,
-   the non-empty assertion and the `osv-scan` deploy gate fixed in `ci.yml` (`40272dd`). Outstanding from it:
-   ADR-0026 (CSP) awaiting Ryan; Renovate installed 2026-09-18 (free tier), first-run PR/dashboard
-   issue not yet confirmed. Branch protection on `main` done 2026-09-18 — see Status above.
+   the non-empty assertion and the `osv-scan` deploy gate fixed in `ci.yml` (`40272dd`). All four
+   items it left open are now closed (2026-09-18): ADR-0026 (CSP) accepted and shipped; branch
+   protection set on `main`; Renovate confirmed installed and working (PR #3 merged). See Status
+   above.
    ADR-0012's body names a pnpm field that doesn't exist (`allowBuilds`; the real one is
    `onlyBuiltDependencies`) — the ADR is immutable, so the correction lives in the journal.
 
@@ -347,3 +356,9 @@ and [`reviews/`](reviews/README.md) for stance reviews._
   the same day (catching an accidental paid-tier default and switching to free before confirming).
   No dashboard issue or PR yet as of install; a follow-up check is on the list. See
   [journal 2026-09-18](journal/2026-09-18-branch-protection-and-renovate-check.md).
+- **2026-09-18 (2)** — Confirmed Renovate is alive: it opened PR #3 (`actions/checkout` digest
+  bump), Ryan merged it manually. Then he accepted ADR-0026 and asked for it implemented directly:
+  the CSP meta tag landed on all five pages, `pnpm build` stayed clean, and a throwaway
+  headless-Chromium pass — including an actual `player.html` load exercising the real YouTube
+  IFrame API — showed zero CSP violations. ADR-0026 flipped to Accepted. See
+  [journal 2026-09-18 (2)](journal/2026-09-18-2-csp-accepted-and-shipped.md).

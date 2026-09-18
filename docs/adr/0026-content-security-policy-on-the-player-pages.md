@@ -1,5 +1,5 @@
 # ADR-0026: Constrain what a page may load with a Content-Security-Policy meta tag
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-17
 - Deciders: Ryan
 

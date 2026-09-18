@@ -55,3 +55,4 @@ Terse and first-person is fine. This is a lab notebook, not a report.
 | [2026-09-15 (4)](2026-09-15-4-slice-3b-core-and-store.md) | Slice 3b parts 1–2: collision detection, diff emitter, draft store — and two ordering bugs (aliased state, coin-toss event order) |
 | [2026-09-17](2026-09-17-supply-chain-audit.md) | Supply-chain audit: all 8 ADRs verified, SBOM subject/floor + `osv-scan` deploy gate fixed; ADR-0026 (CSP) proposed; branch protection and Renovate installation flagged as unresolved |
 | [2026-09-18](2026-09-18-branch-protection-and-renovate-check.md) | Branch protection on `main` set via `gh api` (PR required, status checks, no admin enforcement); Renovate confirmed not installed (Ryan checked github.com/settings/installations) |
+| [2026-09-18 (2)](2026-09-18-2-csp-accepted-and-shipped.md) | ADR-0026 accepted; CSP meta tag added to all five pages, verified with a headless-Chromium pass including a real YouTube IFrame API load — zero violations |
