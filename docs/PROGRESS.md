@@ -1,6 +1,6 @@
 # Progress & Status
 
-_Last updated: 2026-09-17_
+_Last updated: 2026-09-18_
 
 ## Status / next
 
@@ -53,6 +53,24 @@ and picks up stale store trees. The real gap is that nothing in 0012–0018 cove
 reaches a viewer — [ADR-0026](adr/0026-content-security-policy-on-the-player-pages.md) proposes a CSP
 and is **waiting on Ryan**. See [journal 2026-09-17](journal/2026-09-17-supply-chain-audit.md).
 
+**2026-09-18 — branch protection set; Renovate still unconfirmed.** `main` now requires a pull
+request before merging (0 required approvals — Ryan is the only reviewer, so requiring one would
+deadlock every PR) plus the checks that actually run on a PR: `detect languages`, `docs hygiene`,
+`ts fast gates`, `ts supply chain`, `SBOM`, `OSV scan / osv-scan` (`deploy to Pages` excluded — it
+never runs on a PR). `enforce_admins: false`, so Ryan can still push directly to `main` if needed;
+this binds Renovate and any future collaborator, not him. **This changes the workflow**: every
+prior commit on this repo was a direct push to `main`, and that path is now closed unless he uses
+the admin bypass. Force-push and branch deletion are blocked outright. Renovate's installation is
+was still unconfirmed via API at the time (the endpoints that would say so directly aren't
+reachable with this token), but four days post-adoption there was no Dependency Dashboard issue
+(which `config:recommended` turns on unconditionally), no PRs, no bot activity in repo events, and
+no webhooks — leaning not installed. Ryan checked <https://github.com/settings/installations> the
+same day and confirmed it was missing, then **installed it the same day** — the onboarding flow
+defaulted to a paid tier, which he caught and switched to free before confirming. No Dependency
+Dashboard issue or PR yet as of this update; that's expected on a first run and is worth checking
+again in a day or two. See
+[journal 2026-09-18](journal/2026-09-18-branch-protection-and-renovate-check.md).
+
 **Next:**
 1. Ryan: `pnpm install`, restart the dev server as `pnpm dev` (still `0.0.0.0:8080`), click
    through the unverified list above — now including a no-choice show playing through (load the
@@ -65,8 +83,11 @@ and is **waiting on Ryan**. See [journal 2026-09-17](journal/2026-09-17-supply-c
 3. Ryan: decide [ADR-0026](adr/0026-content-security-policy-on-the-player-pages.md) (CSP). It
    changes what ships to viewers, so it is not mine to accept. Accepting it is a small change — a
    meta tag on five pages plus a smoke-test check for console violations.
-4. Ryan: branch protection on `main` (taken on 2026-09-17), and confirm the Renovate app is
-   actually installed — no PR has ever been opened on the repo.
+4. Renovate is now installed (2026-09-18, free tier). Check in a day or two that it actually
+   opened a Dependency Dashboard issue or a first PR — nothing had shown up yet as of install.
+   Branch protection is done (2026-09-18); note the new PR-required workflow on `main` going
+   forward — a direct `git push` to `main` will be rejected unless the admin bypass is used, and
+   Renovate's PRs will land through that same required-checks path.
 
 **Why this started:** Ryan wanted to load previously exported single-show configs (e.g.
 `most-useful-music-theory-for-ukulele 3.json`). Today: home-page **Import All** rejects them
@@ -196,7 +217,8 @@ wiring turns out to need.
 
 6. **Supply-chain audit** — done 2026-09-17. ADRs 0012–0018 all implemented; SBOM subject naming,
    the non-empty assertion and the `osv-scan` deploy gate fixed in `ci.yml` (`40272dd`). Outstanding from it:
-   ADR-0026 (CSP) awaiting Ryan; branch protection (Ryan); Renovate installation unverified.
+   ADR-0026 (CSP) awaiting Ryan; Renovate installed 2026-09-18 (free tier), first-run PR/dashboard
+   issue not yet confirmed. Branch protection on `main` done 2026-09-18 — see Status above.
    ADR-0012's body names a pnpm field that doesn't exist (`allowBuilds`; the real one is
    `onlyBuiltDependencies`) — the ADR is immutable, so the correction lives in the journal.
 
@@ -314,3 +336,14 @@ and [`reviews/`](reviews/README.md) for stance reviews._
   reaches a viewer; [ADR-0026](adr/0026-content-security-policy-on-the-player-pages.md) proposes a
   CSP and is Proposed, not Accepted. See
   [journal 2026-09-17](journal/2026-09-17-supply-chain-audit.md).
+- **2026-09-18** — Branch protection set on `main` via `gh api` at Ryan's request: PR required to
+  merge (0 approvals — Ryan's the only reviewer), the checks that run on a PR required (not
+  `deploy to Pages`, which doesn't), `enforce_admins: false` so Ryan can still bypass, force-push
+  and deletion blocked. Every prior commit was a direct push, so this closes that path going
+  forward unless bypassed. Renovate's installation couldn't be confirmed via API (token isn't
+  authorized for either installation endpoint), but circumstantial signals (no Dependency
+  Dashboard issue, no PRs, no bot events, no webhooks, four days on) leaned not installed — Ryan
+  checked <https://github.com/settings/installations>, confirmed it was missing, and installed it
+  the same day (catching an accidental paid-tier default and switching to free before confirming).
+  No dashboard issue or PR yet as of install; a follow-up check is on the list. See
+  [journal 2026-09-18](journal/2026-09-18-branch-protection-and-renovate-check.md).

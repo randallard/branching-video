@@ -53,3 +53,5 @@ Terse and first-person is fine. This is a lab notebook, not a report.
 | [2026-09-15 (2)](2026-09-15-2-browser-pass-last-node-wrap.md) | Browser pass: ADR-0022 play-through confirmed; last node wraps at 806.5s of an 1190s video — Ryan kept the behaviour, documented the authoring rule |
 | [2026-09-15 (3)](2026-09-15-3-slice-3a-event-log-core.md) | Slice 3a: event-log core, reducer, bundle, migration and IndexedDB store — additive, 30 → 71 tests |
 | [2026-09-15 (4)](2026-09-15-4-slice-3b-core-and-store.md) | Slice 3b parts 1–2: collision detection, diff emitter, draft store — and two ordering bugs (aliased state, coin-toss event order) |
+| [2026-09-17](2026-09-17-supply-chain-audit.md) | Supply-chain audit: all 8 ADRs verified, SBOM subject/floor + `osv-scan` deploy gate fixed; ADR-0026 (CSP) proposed; branch protection and Renovate installation flagged as unresolved |
+| [2026-09-18](2026-09-18-branch-protection-and-renovate-check.md) | Branch protection on `main` set via `gh api` (PR required, status checks, no admin enforcement); Renovate confirmed not installed (Ryan checked github.com/settings/installations) |
