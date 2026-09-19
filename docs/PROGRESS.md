@@ -130,14 +130,16 @@ Export All → Import All of the same bundle is idempotent. See
    deploy step was rewritten 2026-09-15 and, while the corrected copy is confirmed live, no one
    has yet read it as a person following the instructions. **New in this slice, worth Ryan's own
    browser pass too:** Studio's Import config JSON… update-or-add prompt, the Editor's My Drafts
-   menu and Export relabeling, and the home page's three-way Import All.
+   menu and Export relabeling, and the home page's three-way Import All — including importing the
+   **real** ukulele single-show config file (`most-useful-music-theory-for-ukulele 3.json`, the
+   file that started this whole migration), since the CDP smoke test only used synthetic fixtures.
 2. ~~Slice 3b part 3~~ done 2026-09-18 — see above.
 3. ~~Ryan: decide ADR-0026 (CSP).~~ Done 2026-09-18 — accepted and shipped, see above.
 4. ~~Branch protection~~ done 2026-09-18. ~~Renovate installation~~ confirmed installed and
    working 2026-09-18 (PR #3 merged). Note the new PR-required workflow on `main` going forward —
    a direct `git push` to `main` will be rejected unless the admin bypass is used.
-5. Slice 4 (ADR-0023 per-field value history, ADR-0024's UI half) can now start — 3b was its
-   prerequisite.
+5. ~~Slice 4's ADR-0024 UI~~ delivered in 3b.3. What's left of slice 4: **ADR-0023** (per-field
+   value history) — not started.
 
 **Why this started:** Ryan wanted to load previously exported single-show configs (e.g.
 `most-useful-music-theory-for-ukulele 3.json`). Before slice 3b.3: home-page **Import All** rejected
@@ -166,15 +168,16 @@ Reference implementation for the event log, IndexedDB store and bundle format:
 
 Property tests (`fast-check`) on `src/core/`, run by `pnpm test`:
 
-- `slugify` always yields `[a-z0-9]+(-[a-z0-9]+)*` and is idempotent; `uniqueId` / `importedSlug`
-  never return a taken id.
+- `slugify` always yields `[a-z0-9]+(-[a-z0-9]+)*` and is idempotent; `uniqueId` never returns a
+  taken id.
 - `extractVideoId` recovers any 11-character id from every supported URL shape.
 - `normalizeConfig` and `validate` never throw on arbitrary JSON; any well-formed linear chain of
   1–30 nodes validates with zero errors and warnings; every dangling choice target is reported.
-- Both serializers are stable (`serialize ∘ normalize ∘ serialize = serialize`), emit no `_` or
-  undefined keys, and round-trip the real ukulele export exactly.
-- Legacy backup import classification partitions every importable entry into exactly one of
-  fresh / identical / conflict, and a machine importing its own backup gets no fresh or conflicts.
+- `serialize` is stable (`serialize ∘ normalize ∘ serialize = serialize`), emits no `_` or
+  undefined keys, round-trips the real ukulele export exactly, always writes
+  `choiceDisplaySeconds`, and normalizes every `endScreen` link to exactly one of `url`/`target`
+  (unified from the two diverging pre-3b.3 serializers — see [journal
+  2026-09-18 (3)](journal/2026-09-18-3-slice-3b3-page-wiring.md)).
 - Manifest build/parse round-trips.
 - Segment-end routing: `continue` only ever targets the immediately following node and never
   fires from the last node; choices show exactly when a node has them; the validator's
@@ -255,15 +258,15 @@ the page-level wiring itself is exercised by the throwaway CDP smoke test, not u
        collisions are reported rather than silently resolved. **This adds work to 3b:** `reduce`
        must return the collisions it noticed alongside the shows, and import must be wired as
        something the UI observes rather than a silent background fold.
-4. **Slice 4 — the feature.** Single-show config import through Import All (multi-file) and
-   Studio, per ADR-0011. Then retest with the ukulele file.
-   Then, on top of the event log and in this order:
+4. **Slice 4 — the feature.** ~~Single-show config import through Import All (multi-file) and
+   Studio, per ADR-0011.~~ Delivered ahead of schedule as part of 3b.3 (2026-09-18) rather than a
+   separate slice — see Status/Worklist item 3 above. Retest with the real ukulele file is still
+   owed (Ryan; the CDP smoke test used synthetic fixtures, not it). ~~Delete-versus-edit
+   notification (ADR-0024) — the UI half.~~ Also delivered in 3b.3: `ui/collisions.ts`'s
+   `notifyCollisions`, wired into all three pages. What's left of this slice:
    - **Per-field value history** ([ADR-0023](adr/0023-per-field-value-history.md)) — derived from
      the events, so no schema work; the cost is an affordance on every edited field across Studio
-     and the Editor.
-   - **Delete-versus-edit notification**
-     ([ADR-0024](adr/0024-node-removal-collisions-ask-rather-than-resolve.md)) — the UI half. The
-     `reduce` half lands in 3b, because the collision has to be detected before it can be shown.
+     and the Editor. Not started.
 5. **Cutover** — done 2026-09-14 (see Status); its documentation debt cleared and shipped
    2026-09-15 (`f0d76df`).
    `README.md`'s "Deploy" section and `create.html` step 2 now say Pages source = GitHub Actions
