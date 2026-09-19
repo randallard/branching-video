@@ -30,6 +30,8 @@ test("show settings in the drawer carry history too", async ({ app: { page } }) 
 test("the drawer's My Drafts picks a draft by number", async ({ app: { page, dialogs } }) => {
   await gotoEditor(page);
   await page.locator("#fileInput").setInputFiles(fixture("branching.json"));
+  // The page shows the import only once it's stored — wait for that before navigating away.
+  await expect(field(page, "#editor", "Title").locator("input")).toHaveValue("Intro");
   await gotoEditor(page);
   await page.locator("#mobile-menu-btn").click();
   dialogs.prompt("1");
