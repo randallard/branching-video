@@ -16,11 +16,13 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "e2e": "pnpm build && playwright test",
     "lint": "eslint . --max-warnings 0",
     "validate": "node tools/validate-config.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
     "@types/node": "24.13.3",
     "eslint": "10.10.0",
     "fast-check": "4.7.0",

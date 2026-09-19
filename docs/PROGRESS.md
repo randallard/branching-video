@@ -1,6 +1,6 @@
 # Progress & Status
 
-_Last updated: 2026-09-18_
+_Last updated: 2026-09-19_
 
 ## Status / next
 
@@ -123,21 +123,55 @@ phantom draft, but a real edit does, and that edit is immediately browsable from
 Export All → Import All of the same bundle is idempotent. See
 [journal 2026-09-18 (3)](journal/2026-09-18-3-slice-3b3-page-wiring.md).
 
+**2026-09-19 — ADR-0023 (per-field value history) built — committed `060f897`, in PR, awaiting Ryan's local
+check.** This is the last piece of slice 4, so **the migration's planned feature work is complete**
+once it's committed. A field that has held other values shows a **⟲ n** badge by its label; it opens
+an inline list (value, when, *edited*/*imported*/*set when the node was added*) with a **Use**
+button that re-applies the value as an ordinary edit. It covers every Editor field (show settings
+and node fields, including choices and end screen) and the fields Studio edits. It's derived from the
+reducer's own fold (`reduce(events, recorder)` → `core/history.ts`), so it can't disagree with it.
+Building it exposed that **the Editor was writing one event per keystroke**, which violates ADR-0007's
+coalescing requirement and would have made every history a list of typed prefixes. It now uses
+`DraftSession.persistSoon` (1 s edit-burst debounce, flushed on hide/pagehide and before any
+draft switch). A latent race where a queued save could land on a *different* draft after switching
+is fixed too. `pnpm test` 113 → 125; lint/tsc/build clean; CDP smoke test 19/20 (the one failure is
+the known favicon 404). See [journal 2026-09-19](journal/2026-09-19-adr-0023-per-field-history.md).
+
+**2026-09-19 (2) — ADR-0027: a committed Playwright browser suite, same commit (`060f897`).**
+Ryan chose Playwright over writing a manual test doc. `e2e/` now holds 60 Chromium tests against the
+built site (`pnpm e2e`). It's hermetic: `www.youtube.com/iframe_api` is answered by a fake
+IFrame API with a test-driven clock, and every other off-origin request is blocked. So segment
+routing, choices, the countdown, asides and end screens are tested deterministically. Every test
+fails on a console error or CSP violation (ADR-0026's standing check, finally somewhere to live).
+Two-device merges run as two browser contexts. That covers **almost all of the "not verified in a
+browser" list** that had built up since slice 2, including the real ukulele file and the ADR-0023
+two-device case. New `e2e` CI job; **the deploy now waits on it**. Ran 3× back to back locally,
+180/180, no flakes. **It found three real bugs, all fixed:** the home page's import summary said
+"updated" when you'd chosen to add a separate draft; Import/Export All could fire before the draft
+store had opened; and the Editor's New… from a video URL never picked up the video's title (a
+stale-object guard from the slice-2 port). What stays manual is five items in
+[`e2e/README.md`](../e2e/README.md#what-stays-manual). See
+[journal 2026-09-19 (2)](journal/2026-09-19-2-playwright-suite.md).
+
 **Next:**
-1. Ryan: `pnpm install`, restart the dev server as `pnpm dev` (still `0.0.0.0:8080`), click
-   through the unverified list above — now including a no-choice show playing through (load the
-   ukulele file in Studio → Play ▶). Also give `create.html` a read on the live site: its
-   deploy step was rewritten 2026-09-15 and, while the corrected copy is confirmed live, no one
-   has yet read it as a person following the instructions. **New in this slice, worth Ryan's own
-   browser pass too:** Studio's Import config JSON… update-or-add prompt, the Editor's My Drafts
-   menu and Export relabeling, and the home page's three-way Import All.
-2. ~~Slice 3b part 3~~ done 2026-09-18 — see above.
-3. ~~Ryan: decide ADR-0026 (CSP).~~ Done 2026-09-18 — accepted and shipped, see above.
-4. ~~Branch protection~~ done 2026-09-18. ~~Renovate installation~~ confirmed installed and
-   working 2026-09-18 (PR #3 merged). Note the new PR-required workflow on `main` going forward —
-   a direct `git push` to `main` will be rejected unless the admin bypass is used.
-5. Slice 4 (ADR-0023 per-field value history, ADR-0024's UI half) can now start — 3b was its
-   prerequisite.
+0. **Ryan: review and merge the PR** (branch `adr-0023-history-and-e2e-suite`: `060f897` + a docs
+   commit, plus the earlier docs fix `8b767fb` that was sitting unpushed on local `main`). To
+   check locally: `pnpm install`, `pnpm exec playwright install chromium` (once), `pnpm e2e`, and
+   60 should pass. Try ⟲ by hand
+   in `pnpm dev` if you want to see it. `main` needs a PR (or the admin bypass). **After the first
+   green CI run on the PR, add `e2e (playwright)` to `main`'s required status checks** (same
+   `gh api` call as 2026-09-18). It isn't required until then, so a PR could merge with it red
+   (though the deploy would still refuse).
+1. **The five manual checks** in [`e2e/README.md`](../e2e/README.md#what-stays-manual): real
+   YouTube playback feel, Studio against a real video, a real phone, the native Save As dialog,
+   and reading `create.html` as a newcomer. That list replaces the long "click through the
+   unverified list" item that used to be here; everything else on it is now a test.
+2. ~~Slice 3b part 3~~ done 2026-09-18. ~~ADR-0026 (CSP)~~ done 2026-09-18. ~~Branch
+   protection, Renovate~~ done 2026-09-18 (a direct `git push` to `main` is rejected without
+   the admin bypass).
+3. ~~Slice 4~~: ADR-0024 UI delivered in 3b.3, ADR-0023 built 2026-09-19 (item 0).
+4. After that: **nothing planned is left in the migration.** The "not yet scheduled" lists under
+   Worklist are what remains to pick from.
 
 **Why this started:** Ryan wanted to load previously exported single-show configs (e.g.
 `most-useful-music-theory-for-ukulele 3.json`). Before slice 3b.3: home-page **Import All** rejected
@@ -156,6 +190,7 @@ Target state, decided 2026-09-14. Links rather than restatement:
 - Hosting: Pages from the CI artifact (`DEPLOY_PAGES`) — [ADR-0006](adr/0006-pages-deploy-from-ci-build-artifact.md)
 - Storage: IndexedDB append-only event log, event-bundle backups — [ADR-0007](adr/0007-indexeddb-append-only-event-log-storage.md); event model [0008](adr/0008-edit-level-events-per-field-last-writer-wins.md), identity [0009](adr/0009-show-identity-by-generated-id-not-slug.md), legacy import [0011](adr/0011-legacy-drafts-and-backups-import-as-snapshot-events.md)
 - Show file format unchanged (player, `live/`, and cycle-in depend on it) — [ADR-0010](adr/0010-config-json-stays-the-publish-and-interchange-format.md)
+- Browser tests: committed Playwright suite against the built site, hermetic — [ADR-0027](adr/0027-playwright-browser-tests-against-the-built-site.md)
 - Supply chain — ADRs [0012](adr/0012-block-install-time-scripts.md)–[0018](adr/0018-pin-actions-to-commit-shas.md); licence [0019](adr/0019-dual-mit-apache-license.md)
 
 Reference implementation for the event log, IndexedDB store and bundle format:
@@ -166,15 +201,16 @@ Reference implementation for the event log, IndexedDB store and bundle format:
 
 Property tests (`fast-check`) on `src/core/`, run by `pnpm test`:
 
-- `slugify` always yields `[a-z0-9]+(-[a-z0-9]+)*` and is idempotent; `uniqueId` / `importedSlug`
-  never return a taken id.
+- `slugify` always yields `[a-z0-9]+(-[a-z0-9]+)*` and is idempotent; `uniqueId` never returns a
+  taken id.
 - `extractVideoId` recovers any 11-character id from every supported URL shape.
 - `normalizeConfig` and `validate` never throw on arbitrary JSON; any well-formed linear chain of
   1–30 nodes validates with zero errors and warnings; every dangling choice target is reported.
-- Both serializers are stable (`serialize ∘ normalize ∘ serialize = serialize`), emit no `_` or
-  undefined keys, and round-trip the real ukulele export exactly.
-- Legacy backup import classification partitions every importable entry into exactly one of
-  fresh / identical / conflict, and a machine importing its own backup gets no fresh or conflicts.
+- `serialize` is stable (`serialize ∘ normalize ∘ serialize = serialize`), emits no `_` or
+  undefined keys, round-trips the real ukulele export exactly, always writes
+  `choiceDisplaySeconds`, and normalizes every `endScreen` link to exactly one of `url`/`target`
+  (unified from the two diverging pre-3b.3 serializers — see [journal
+  2026-09-18 (3)](journal/2026-09-18-3-slice-3b3-page-wiring.md)).
 - Manifest build/parse round-trips.
 - Segment-end routing: `continue` only ever targets the immediately following node and never
   fires from the last node; choices show exactly when a node has them; the validator's
@@ -207,10 +243,25 @@ Added in slice 3b parts 1–2 (`diff.test.ts`, `shell/draft-store.test.ts`, more
 - Re-importing the same bundle or the same config file adds nothing.
 - An ADR-0024 collision is reported with the node as it stood, and both answers settle it.
 
-Not yet: nothing outstanding in the core. 3b.3's page wiring added `draft-session.test.ts` and
-`ui/collisions.test.ts` (thin coverage over already-tested store methods) and
-`core/serialize.test.ts`-equivalent coverage inside `config.test.ts` for the unified serializer;
-the page-level wiring itself is exercised by the throwaway CDP smoke test, not unit tests.
+Added for ADR-0023 (`history.test.ts`, more in `shell/draft-session.test.ts`):
+
+- Every field's history ends on the value `reduce` holds, over arbitrary event sets. The history
+  observes the reducer's own fold, and this checks that it agrees.
+- Histories are a function of the event set: unchanged by reordering or duplicating events.
+- Prior values never include the current value, an empty value, or the same value twice.
+- The losing side of a two-device edit is recoverable; recovering it via `diffShow` emits exactly
+  one `show-field-set`, and the displaced value joins the history; an edit discarded by a node
+  removal (ADR-0024) never appears.
+- A burst of `persistSoon` calls writes one event; a pending edit lands on the show it was made on
+  even if another draft is opened first.
+
+Not yet: nothing outstanding in the core.
+
+**Browser tier (ADR-0027, 2026-09-19):** the page-level wiring, which used to rest on throwaway
+CDP scripts, is covered by the committed Playwright suite in `e2e/` (60 tests; table of what each
+file covers in [`e2e/README.md`](../e2e/README.md)). Unlike the tiers above these are examples,
+not properties, and they run against a fake YouTube player, so they prove the routing logic
+against a model of the API, not YouTube itself.
 
 ## Worklist
 
@@ -255,15 +306,16 @@ the page-level wiring itself is exercised by the throwaway CDP smoke test, not u
        collisions are reported rather than silently resolved. **This adds work to 3b:** `reduce`
        must return the collisions it noticed alongside the shows, and import must be wired as
        something the UI observes rather than a silent background fold.
-4. **Slice 4 — the feature.** Single-show config import through Import All (multi-file) and
-   Studio, per ADR-0011. Then retest with the ukulele file.
-   Then, on top of the event log and in this order:
-   - **Per-field value history** ([ADR-0023](adr/0023-per-field-value-history.md)) — derived from
-     the events, so no schema work; the cost is an affordance on every edited field across Studio
-     and the Editor.
-   - **Delete-versus-edit notification**
-     ([ADR-0024](adr/0024-node-removal-collisions-ask-rather-than-resolve.md)) — the UI half. The
-     `reduce` half lands in 3b, because the collision has to be detected before it can be shown.
+4. **Slice 4 — the feature.** ~~Single-show config import through Import All (multi-file) and
+   Studio, per ADR-0011.~~ Delivered ahead of schedule as part of 3b.3 (2026-09-18) rather than a
+   separate slice — see Status/Worklist item 3 above. Retest with the real ukulele file is still
+   owed (Ryan; the CDP smoke test used synthetic fixtures, not it). ~~Delete-versus-edit
+   notification (ADR-0024) — the UI half.~~ Also delivered in 3b.3: `ui/collisions.ts`'s
+   `notifyCollisions`, wired into all three pages.
+   - ~~**Per-field value history** ([ADR-0023](adr/0023-per-field-value-history.md))~~ — built
+     2026-09-19 (`060f897`, in PR): `core/history.ts`, `ui/history.ts`,
+     `DraftStore.priorValues`, wired into every Editor field and Studio's sidebar. See
+     [journal 2026-09-19](journal/2026-09-19-adr-0023-per-field-history.md).
 5. **Cutover** — done 2026-09-14 (see Status); its documentation debt cleared and shipped
    2026-09-15 (`f0d76df`).
    `README.md`'s "Deploy" section and `create.html` step 2 now say Pages source = GitHub Actions
@@ -286,7 +338,8 @@ Found in slice 2, not yet scheduled:
   patch: slice 3b.3's draft-first autosave means an edit is persisted moments after it's made
   (matching Studio, which never had this guard), so `dirty`/`beforeunload`/`confirmDiscard` were
   deleted rather than fixed.
-- No favicon (404 on every page).
+- No favicon (404 on every page). The e2e harness ignores exactly this one console error; drop
+  that exception in `e2e/support/app.ts` when a favicon lands.
 
 Carried over, not yet scheduled (from `notes.txt`):
 - Single-choice default nodes should auto-advance with no choice UI or 8s countdown (scoped

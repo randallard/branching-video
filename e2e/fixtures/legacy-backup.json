@@ -1,0 +1,14 @@
+{
+  "type": "bvp-backup",
+  "version": 1,
+  "exportedAt": 1767225600000,
+  "index": [{ "slug": "old-draft", "title": "Old Draft From Before", "modified": 1767225600000 }],
+  "configs": {
+    "old-draft": {
+      "title": "Old Draft From Before",
+      "startNode": "intro",
+      "masterVideoId": "BBBBBBBBBBB",
+      "nodes": [{ "id": "intro", "title": "Intro", "start": 0, "end": 5, "choices": [] }]
+    }
+  }
+}

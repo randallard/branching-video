@@ -13,6 +13,8 @@ import type { ShowConfig } from "../core/config.ts";
 import { diffShow, emptyShowState, workingFromState } from "../core/diff.ts";
 import type { WorkingShow } from "../core/diff.ts";
 import type { ShowEvent } from "../core/events.ts";
+import { buildHistories, historyKey, priorValues } from "../core/history.ts";
+import type { FieldHistories, FieldRef, HistoryEntry } from "../core/history.ts";
 import { parseBundle, serializeBundle, unionEvents } from "../core/bundle.ts";
 import type { RemovalCollision, ShowState, ShowsState } from "../core/reduce.ts";
 import { findShow, reduce, toConfig } from "../core/reduce.ts";
@@ -49,6 +51,9 @@ function newId(): string {
 
 export class DraftStore {
   private state: ShowsState = reduce([]);
+  private events: readonly ShowEvent[] = [];
+  /** Built on first ask and dropped on every adopt — most page loads never open a history. */
+  private histories: FieldHistories | null = null;
   private readonly store: EventStore;
   /** False when IndexedDB was unavailable, so the page can say the session won't be kept. */
   readonly persistent: boolean;
@@ -77,7 +82,15 @@ export class DraftStore {
    */
   private adopt(events: readonly ShowEvent[]): void {
     this.state = reduce(events);
+    this.events = events;
+    this.histories = null;
     for (const e of events) if (e.at > this.lastAt) this.lastAt = e.at;
+  }
+
+  /** What else a field has been, newest first (ADR-0023). Recovering one is an ordinary `save`. */
+  priorValues(ref: FieldRef): HistoryEntry[] {
+    this.histories ??= buildHistories(this.events);
+    return priorValues(this.histories.get(historyKey(ref)) ?? []);
   }
 
   /**

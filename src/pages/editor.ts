@@ -1,6 +1,6 @@
 // Editor: form-based editing of a whole show config, with live validation.
 import { isRecord, normalizeConfig } from "../core/config.ts";
-import type { Choice, EndLink, ShowConfig, ShowNode } from "../core/config.ts";
+import type { Choice, EndLink, EndScreen, ShowConfig, ShowNode } from "../core/config.ts";
 import { serialize as serializeConfig, toFileText } from "../core/serialize.ts";
 import { extractVideoId, slugify, uniqueId } from "../core/text.ts";
 import { validate } from "../core/validate.ts";
@@ -13,6 +13,11 @@ import { errorMessage, readFileText } from "../shell/files.ts";
 import { SHOWS_DIR, fetchShows, fetchVideoTitle } from "../shell/shows.ts";
 import { notifyCollisions } from "../ui/collisions.ts";
 import { button, byId, checkedOf, el, input, valueOf } from "../ui/dom.ts";
+import { FieldHistoryUi } from "../ui/history.ts";
+import type { MountedHistory } from "../ui/history.ts";
+import type { FieldRef } from "../core/history.ts";
+import type { HistoryField } from "../core/reduce.ts";
+import type { ShowField } from "../core/events.ts";
 
 // ---- File System Access API (Chromium) — not in TypeScript's DOM lib ------------------------
 interface FsaPickerOptions {
@@ -40,6 +45,7 @@ let fileName = "config.json";
 let fileHandle: FileSystemFileHandle | null = null; // when the browser supports FSA
 let draftStore: DraftStore;
 let session: DraftSession;
+let histories: FieldHistoryUi;
 
 function blankConfig(): ShowConfig {
   return { title: "Untitled Show", startNode: "", choiceDisplaySeconds: 8, masterVideoId: "", nodes: [] };
@@ -83,13 +89,82 @@ function renameNode(oldId: string, newId: string): boolean {
 
 const serialize = (): ShowConfig => serializeConfig(config);
 
-function field(labelText: string, control: HTMLElement, hint?: string): HTMLElement {
+function field(labelText: string, control: HTMLElement, hint?: string, history?: MountedHistory): HTMLElement {
   return el("div", { class: "field" }, [
-    el("label", { text: labelText }),
+    el("label", {}, [labelText, history?.badge]),
     control,
     hint ? el("div", { class: "hint", text: hint }) : null,
+    history?.panel,
   ]);
 }
+
+// ---- per-field history (ADR-0023) ----------------------------------------------------------
+function copyOf<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function showHist(field: ShowField): MountedHistory {
+  return histories.mount({
+    ref: () => (session.showId === null ? null : { showId: session.showId, nodeKey: null, field }),
+    restore: (value) => {
+      if (field === "choiceDisplaySeconds") {
+        if (typeof value === "number") config.choiceDisplaySeconds = value;
+      } else if (typeof value === "string") {
+        config[field] = value;
+      }
+      structural();
+    },
+  });
+}
+
+function nodeHist(n: ShowNode, field: HistoryField): MountedHistory {
+  const ref = (): FieldRef | null => {
+    const nodeKey = session.nodeKeys[config.nodes.indexOf(n)];
+    return session.showId === null || !nodeKey ? null : { showId: session.showId, nodeKey, field };
+  };
+  return histories.mount({
+    ref,
+    restore: (value) => {
+      restoreNodeField(n, field, value);
+    },
+  });
+}
+
+/** A recovered value is applied like any other edit, so it goes through the same persist. */
+function restoreNodeField(n: ShowNode, field: HistoryField, value: unknown): void {
+  switch (field) {
+    case "id":
+      if (typeof value !== "string" || !renameNode(n.id, value)) return;
+      break;
+    case "title":
+    case "videoId":
+    case "returnTo":
+      if (typeof value === "string") n[field] = value;
+      break;
+    case "start":
+    case "end":
+    case "showChoicesAt":
+      if (typeof value === "number") n[field] = value;
+      break;
+    case "isAside":
+    case "defaultAside":
+    case "returnAtCurrentTime":
+      n[field] = value === true;
+      break;
+    case "endScreen":
+      n.endScreen = copyOf(value as EndScreen);
+      break;
+    case "choices":
+      n.choices = copyOf(value as Choice[]);
+      break;
+    case "startNode":
+    case "masterVideoId":
+    case "choiceDisplaySeconds":
+      return;
+  }
+  structural();
+}
+
 function numOrUndefined(v: string): number | undefined {
   if (v === "") return undefined;
   const n = Number(v);
@@ -102,6 +177,11 @@ function numOrUndefined(v: string): number | undefined {
  * config already saved by import, must not itself spawn a new draft. */
 async function persistNow(): Promise<void> {
   await session.persist(config);
+}
+
+/** For typing: written once the burst pauses, so a field gets one event, not one per keystroke. */
+function persistSoon(): void {
+  session.persistSoon(config);
 }
 
 function renderAll(): void {
@@ -151,12 +231,14 @@ function renderShowSettings(): void {
           value: config.title || "",
           oninput: (e) => {
             config.title = valueOf(e);
-            void persistNow();
+            persistSoon();
           },
-        })
+        }),
+        undefined,
+        showHist("title")
       )
     );
-    host.appendChild(field("Start node", startSel));
+    host.appendChild(field("Start node", startSel, undefined, showHist("startNode")));
     host.appendChild(
       el("div", { class: "row" }, [
         field(
@@ -168,9 +250,11 @@ function renderShowSettings(): void {
             oninput: (e) => {
               config.choiceDisplaySeconds = numOrUndefined(valueOf(e));
               runValidation();
-              void persistNow();
+              persistSoon();
             },
-          })
+          }),
+          undefined,
+          showHist("choiceDisplaySeconds")
         ),
       ])
     );
@@ -184,10 +268,11 @@ function renderShowSettings(): void {
           oninput: (e) => {
             config.masterVideoId = valueOf(e);
             runValidation();
-            void persistNow();
+            persistSoon();
           },
         }),
-        "Default for nodes without their own videoId."
+        "Default for nodes without their own videoId.",
+        showHist("masterVideoId")
       )
     );
   }
@@ -294,7 +379,7 @@ function numberInput(value: number | undefined, set: (v: number | undefined) => 
     oninput: (e) => {
       set(numOrUndefined(valueOf(e)));
       runValidation();
-      void persistNow();
+      persistSoon();
     },
   });
 }
@@ -322,7 +407,8 @@ function renderForm(): void {
             else renderForm();
           },
         }),
-        "Used in the URL hash. Renaming updates all references."
+        "Used in the URL hash. Renaming updates all references.",
+        nodeHist(n, "id")
       ),
       field(
         "Title",
@@ -331,9 +417,13 @@ function renderForm(): void {
           value: n.title || "",
           oninput: (e) => {
             n.title = valueOf(e);
-            onEdit();
+            renderNodeList();
+            runValidation();
+            persistSoon();
           },
-        })
+        }),
+        undefined,
+        nodeHist(n, "title")
       ),
     ])
   );
@@ -347,17 +437,23 @@ function renderForm(): void {
         oninput: (e) => {
           n.videoId = valueOf(e);
           runValidation();
-          void persistNow();
+          persistSoon();
         },
       }),
-      "Overrides the master video for this node. Leave blank to use the master."
+      "Overrides the master video for this node. Leave blank to use the master.",
+      nodeHist(n, "videoId")
     )
   );
   basics.appendChild(
     el("div", { class: "row" }, [
-      field("Start (s)", numberInput(n.start, (v) => (n.start = v))),
-      field("End (s)", numberInput(n.end, (v) => (n.end = v))),
-      field("Show choices at (s)", numberInput(n.showChoicesAt, (v) => (n.showChoicesAt = v))),
+      field("Start (s)", numberInput(n.start, (v) => (n.start = v)), undefined, nodeHist(n, "start")),
+      field("End (s)", numberInput(n.end, (v) => (n.end = v)), undefined, nodeHist(n, "end")),
+      field(
+        "Show choices at (s)",
+        numberInput(n.showChoicesAt, (v) => (n.showChoicesAt = v)),
+        undefined,
+        nodeHist(n, "showChoicesAt")
+      ),
     ])
   );
   host.appendChild(basics);
@@ -365,24 +461,39 @@ function renderForm(): void {
   // --- aside / routing card ---
   const routing = el("div", { class: "card" }, [el("h2", {}, ["Aside & routing"])]);
   routing.appendChild(
-    checkbox("Is aside (deep dive)", !!n.isAside, (v) => {
-      n.isAside = v;
-      structural();
-    })
+    checkbox(
+      "Is aside (deep dive)",
+      !!n.isAside,
+      (v) => {
+        n.isAside = v;
+        structural();
+      },
+      nodeHist(n, "isAside")
+    )
   );
   routing.appendChild(
-    checkbox("Default aside — show persistent “Skip → back to main” button", !!n.defaultAside, (v) => {
-      n.defaultAside = v;
-      runValidation();
-      void persistNow();
-    })
+    checkbox(
+      "Default aside — show persistent “Skip → back to main” button",
+      !!n.defaultAside,
+      (v) => {
+        n.defaultAside = v;
+        runValidation();
+        void persistNow();
+      },
+      nodeHist(n, "defaultAside")
+    )
   );
   routing.appendChild(
-    checkbox("Return at current time — resume the branch point on exit", !!n.returnAtCurrentTime, (v) => {
-      n.returnAtCurrentTime = v;
-      runValidation();
-      void persistNow();
-    })
+    checkbox(
+      "Return at current time — resume the branch point on exit",
+      !!n.returnAtCurrentTime,
+      (v) => {
+        n.returnAtCurrentTime = v;
+        runValidation();
+        void persistNow();
+      },
+      nodeHist(n, "returnAtCurrentTime")
+    )
   );
   routing.appendChild(
     field(
@@ -391,14 +502,21 @@ function renderForm(): void {
         n.returnTo = v || undefined;
         onEdit();
       }),
-      "Auto-route here when this segment ends. Required for default asides / used as fallback for resume."
+      "Auto-route here when this segment ends. Required for default asides / used as fallback for resume.",
+      nodeHist(n, "returnTo")
     )
   );
   host.appendChild(routing);
 
   // --- choices card ---
+  const choicesHist = nodeHist(n, "choices");
   const choicesCard = el("div", { class: "card" }, [
-    el("h2", {}, ["Choices ", el("span", { class: "pill", text: "(" + String(n.choices.length) + ")" })]),
+    el("h2", {}, [
+      "Choices ",
+      el("span", { class: "pill", text: "(" + String(n.choices.length) + ")" }),
+      choicesHist.badge,
+    ]),
+    choicesHist.panel,
   ]);
   n.choices.forEach((c, idx) => choicesCard.appendChild(renderChoice(n, c, idx)));
   choicesCard.appendChild(
@@ -419,7 +537,8 @@ function renderForm(): void {
   host.appendChild(choicesCard);
 
   // --- end screen card ---
-  const esCard = el("div", { class: "card" }, [el("h2", {}, ["End screen"])]);
+  const esHist = nodeHist(n, "endScreen");
+  const esCard = el("div", { class: "card" }, [el("h2", {}, ["End screen", esHist.badge]), esHist.panel]);
   esCard.appendChild(
     checkbox("Has end screen (terminal node)", !!n.endScreen, (v) => {
       n.endScreen = v ? { heading: "", body: "", links: [] } : undefined;
@@ -438,7 +557,7 @@ function renderForm(): void {
           value: es.heading || "",
           oninput: (e) => {
             es.heading = valueOf(e);
-            void persistNow();
+            persistSoon();
           },
         })
       )
@@ -451,7 +570,7 @@ function renderForm(): void {
           {
             oninput: (e) => {
               es.body = valueOf(e);
-              void persistNow();
+              persistSoon();
             },
           },
           [es.body || ""]
@@ -495,7 +614,12 @@ function renderForm(): void {
   );
 }
 
-function checkbox(labelText: string, checked: boolean, onchange: (v: boolean) => void): HTMLElement {
+function checkbox(
+  labelText: string,
+  checked: boolean,
+  onchange: (v: boolean) => void,
+  history?: MountedHistory
+): HTMLElement {
   const box = el("input", {
     type: "checkbox",
     onchange: (e) => {
@@ -503,7 +627,8 @@ function checkbox(labelText: string, checked: boolean, onchange: (v: boolean) =>
     },
   });
   if (checked) box.checked = true;
-  return el("label", { class: "check" }, [box, el("span", { text: labelText })]);
+  const label = el("label", { class: "check" }, [box, el("span", { text: labelText })]);
+  return history ? el("div", {}, [el("div", { class: "check-row" }, [label, history.badge]), history.panel]) : label;
 }
 
 function renderChoice(n: ShowNode, c: Choice, idx: number): HTMLElement {
@@ -586,7 +711,7 @@ function renderChoice(n: ShowNode, c: Choice, idx: number): HTMLElement {
           oninput: (e) => {
             c.label = valueOf(e);
             runValidation();
-            void persistNow();
+            persistSoon();
           },
         })
       ),
@@ -635,7 +760,7 @@ function renderLink(links: EndLink[], l: EndLink, idx: number): HTMLElement {
         value: l.label || "",
         oninput: (e) => {
           l.label = valueOf(e);
-          void persistNow();
+          persistSoon();
         },
       })
     ),
@@ -660,7 +785,7 @@ function renderLink(links: EndLink[], l: EndLink, idx: number): HTMLElement {
             l.url = v || undefined;
             if (v) l.target = undefined;
             runValidation();
-            void persistNow();
+            persistSoon();
           },
         }),
         "Use instead of target"
@@ -983,13 +1108,15 @@ async function newConfig(): Promise<void> {
     fresh.nodes = [{ id: "intro", title: "Intro", start: 0, choices: [] }];
   }
   loadConfig(fresh, "config.json");
+  // loadConfig normalizes into a new object, so this — not `fresh` — is what "still open" means.
+  const started = config;
   // "New…" is a deliberate create action, like Studio's startBtn — persist right away rather than
   // waiting for a first edit, so the show is browsable from the home page immediately.
   void persistNow();
   if (id) {
     const title = await fetchVideoTitle(id);
     // Guard against the user having moved on (a different draft, another New…) while this awaited.
-    if (title && config === fresh) {
+    if (title && config === started) {
       config.title = title;
       renderShowSettings();
       void persistNow();
@@ -1109,6 +1236,17 @@ for (const b of bootGatedButtons) b.disabled = true;
 async function boot(): Promise<void> {
   draftStore = await openDraftStore();
   session = new DraftSession(draftStore);
+  histories = new FieldHistoryUi(draftStore);
+  session.onSaved = () => {
+    histories.refresh();
+  };
+  // A typing burst still waiting on its pause is written before the tab goes away.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") void session.flush();
+  });
+  window.addEventListener("pagehide", () => {
+    void session.flush();
+  });
   await notifyCollisions(draftStore);
   for (const b of bootGatedButtons) b.disabled = false;
 

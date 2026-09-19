@@ -1,0 +1,68 @@
+{
+  "title": "E2E Branching",
+  "startNode": "intro",
+  "masterVideoId": "AAAAAAAAAAA",
+  "choiceDisplaySeconds": 1,
+  "nodes": [
+    {
+      "id": "intro",
+      "title": "Intro",
+      "start": 0,
+      "end": 10,
+      "choices": [
+        { "label": "Left", "target": "left", "default": true },
+        { "label": "Right", "target": "right", "style": "secondary" }
+      ]
+    },
+    {
+      "id": "left",
+      "title": "Left path",
+      "start": 10,
+      "end": 20,
+      "showChoicesAt": 12,
+      "choices": [{ "label": "Deep dive", "target": "dive" }]
+    },
+    {
+      "id": "dive",
+      "title": "The dive",
+      "start": 50,
+      "end": 60,
+      "isAside": true,
+      "returnAtCurrentTime": true,
+      "returnTo": "left",
+      "choices": []
+    },
+    {
+      "id": "right",
+      "title": "Right path",
+      "start": 20,
+      "end": 30,
+      "choices": [{ "label": "Finish", "target": "finale" }]
+    },
+    {
+      "id": "extra",
+      "title": "Extra",
+      "start": 30,
+      "end": 40,
+      "isAside": true,
+      "defaultAside": true,
+      "returnTo": "right",
+      "choices": []
+    },
+    {
+      "id": "finale",
+      "title": "Finale",
+      "start": 40,
+      "end": 50,
+      "choices": [],
+      "endScreen": {
+        "heading": "All done",
+        "body": "Thanks for watching",
+        "links": [
+          { "label": "Again", "target": "intro" },
+          { "label": "Site", "url": "https://example.com/" }
+        ]
+      }
+    }
+  ]
+}

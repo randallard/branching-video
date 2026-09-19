@@ -65,6 +65,49 @@ export interface ShowsState {
   collisions: RemovalCollision[];
 }
 
+/** What a field history can be about: every editable field, plus a node's `choices` (which move
+ * as one value, ADR-0008). `order` is left out — it is position bookkeeping, not something a
+ * person typed. */
+export type HistoryField = ShowField | Exclude<NodeField, "order"> | "choices";
+
+/** One value a field took, as the fold applied it (ADR-0023). */
+export interface FieldWrite {
+  showId: string;
+  /** `null` for a show-level field. */
+  nodeKey: string | null;
+  field: HistoryField;
+  /** The value as the reducer stored it — normalized, so it compares like the current value. */
+  value: unknown;
+  at: string;
+  eventId: string;
+  /** Which kind of append set it: a field edit, a whole-show import, or the node being added. */
+  source: "edit" | "import" | "added";
+}
+
+export type FieldRecorder = (write: FieldWrite) => void;
+
+const RECORDED_NODE_FIELDS = [
+  "id",
+  "title",
+  "videoId",
+  "start",
+  "end",
+  "showChoicesAt",
+  "isAside",
+  "defaultAside",
+  "returnAtCurrentTime",
+  "returnTo",
+  "endScreen",
+  "choices",
+] as const;
+
+const RECORDED_SHOW_FIELDS = ["title", "startNode", "masterVideoId", "choiceDisplaySeconds"] as const;
+
+/** Detach a recorded value from reducer state, which later events go on changing. */
+function detach(value: unknown): unknown {
+  return typeof value === "object" && value !== null ? JSON.parse(JSON.stringify(value)) : value;
+}
+
 interface Working {
   showId: string;
   title: string;
@@ -260,7 +303,13 @@ function applySnapshot(show: Working, config: ShowConfig): void {
   });
 }
 
-export function reduce(events: readonly ShowEvent[]): ShowsState {
+/**
+ * `record`, when given, is told every field value the fold actually applies, in fold order — the
+ * raw material for per-field history (ADR-0023). It observes the same fold rather than re-deriving
+ * one, so a history can never disagree with the reducer about which write won or which was
+ * discarded (an edit to a removed node is never applied, so it is never recorded).
+ */
+export function reduce(events: readonly ShowEvent[], record?: FieldRecorder): ShowsState {
   // Dedupe by id — a union merge may hand us the same event twice, and events are immutable, so
   // the first copy is as good as any.
   const byId = new Map<string, ShowEvent>();
@@ -283,23 +332,32 @@ export function reduce(events: readonly ShowEvent[]): ShowsState {
 
   for (const e of ordered) {
     const show = showFor(e.showId);
+    const put = (nodeKey: string | null, field: HistoryField, value: unknown, source: FieldWrite["source"]): void => {
+      record?.({ showId: e.showId, nodeKey, field, value: detach(value), at: e.at, eventId: e.id, source });
+    };
+    const putNode = (entry: NodeState, source: FieldWrite["source"]): void => {
+      for (const field of RECORDED_NODE_FIELDS) put(entry.nodeKey, field, entry.node[field], source);
+    };
     switch (e.kind) {
       case "show-snapshot":
         applySnapshot(show, e.config);
+        if (record) {
+          for (const field of RECORDED_SHOW_FIELDS) put(null, field, show[field], "import");
+          for (const entry of show.nodes.values()) putNode(entry, "import");
+        }
         break;
       case "show-field-set":
         applyShowField(show, e.field, e.value);
+        put(null, e.field, show[e.field], "edit");
         break;
       case "node-added": {
         // A re-add is a deliberate act, so it lifts an earlier removal of that key -- and settles
         // any collision it caused (ADR-0024: answering is just another event).
         show.removed.delete(e.nodeKey);
         show.collisions.delete(e.nodeKey);
-        show.nodes.set(e.nodeKey, {
-          nodeKey: e.nodeKey,
-          order: e.order,
-          node: cloneNode(e.node),
-        });
+        const entry = { nodeKey: e.nodeKey, order: e.order, node: cloneNode(e.node) };
+        show.nodes.set(e.nodeKey, entry);
+        if (record) putNode(entry, "added");
         break;
       }
       case "node-field-set": {
@@ -308,7 +366,10 @@ export function reduce(events: readonly ShowEvent[]): ShowsState {
           break;
         }
         const entry = show.nodes.get(e.nodeKey);
-        if (entry !== undefined) applyNodeField(entry, e.field, e.value);
+        if (entry !== undefined) {
+          applyNodeField(entry, e.field, e.value);
+          if (e.field !== "order") put(e.nodeKey, e.field, entry.node[e.field], "edit");
+        }
         break;
       }
       case "node-choices-set": {
@@ -317,7 +378,10 @@ export function reduce(events: readonly ShowEvent[]): ShowsState {
           break;
         }
         const entry = show.nodes.get(e.nodeKey);
-        if (entry !== undefined) entry.node.choices = cloneChoices(e.choices);
+        if (entry !== undefined) {
+          entry.node.choices = cloneChoices(e.choices);
+          put(e.nodeKey, "choices", entry.node.choices, "edit");
+        }
         break;
       }
       case "node-removed": {

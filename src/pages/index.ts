@@ -126,7 +126,7 @@ function summarize(s: ImportSummary): string {
 // asks once per matching title — update that show, or add as a new one (ADR-0011). This is the
 // feature the whole migration was for: Import All used to reject single-show config files
 // outright, and Studio's own import silently overwrote a same-titled draft.
-async function importAllDrafts(files: FileList): Promise<void> {
+async function importAllDrafts(files: readonly File[]): Promise<void> {
   const summary: ImportSummary = {
     bundleEvents: 0,
     legacyShows: 0,
@@ -136,7 +136,7 @@ async function importAllDrafts(files: FileList): Promise<void> {
   };
   let importedABundle = false;
 
-  for (const file of Array.from(files)) {
+  for (const file of files) {
     let raw: unknown;
     try {
       raw = JSON.parse(await readFileText(file));
@@ -164,10 +164,9 @@ async function importAllDrafts(files: FileList): Promise<void> {
 
     const config = normalizeConfig(raw);
     if (config) {
-      const existed = draftStore.matchingTitle(config.title).length > 0;
       const outcome = await adoptExternalConfig(draftStore, config);
       if (outcome.ok) {
-        if (existed) summary.configsUpdated++;
+        if (outcome.updated) summary.configsUpdated++;
         else summary.configsAdded++;
       } else {
         summary.invalid++;
@@ -183,9 +182,13 @@ async function importAllDrafts(files: FileList): Promise<void> {
   alert(summarize(summary));
 }
 
+// The store opens asynchronously (IndexedDB). These are links, not buttons, so rather than being
+// disabled until then (as Studio and the Editor do), they wait for it.
+const ready = boot();
+
 byId("export-all-btn").addEventListener("click", (ev) => {
   ev.preventDefault();
-  void exportAllDrafts();
+  void ready.then(exportAllDrafts);
 });
 byId("import-all-btn").addEventListener("click", (ev) => {
   ev.preventDefault();
@@ -193,8 +196,9 @@ byId("import-all-btn").addEventListener("click", (ev) => {
 });
 input("import-all-file").addEventListener("change", (ev) => {
   const el = ev.target instanceof HTMLInputElement ? ev.target : null;
-  const files = el?.files;
-  if (files && files.length) void importAllDrafts(files);
+  // Copied now: clearing the input below empties the live FileList.
+  const picked = Array.from(el?.files ?? []);
+  if (picked.length) void ready.then(() => importAllDrafts(picked));
   if (el) el.value = "";
 });
 
@@ -203,5 +207,3 @@ async function boot(): Promise<void> {
   await notifyCollisions(draftStore);
   renderLocalDrafts();
 }
-
-void boot();

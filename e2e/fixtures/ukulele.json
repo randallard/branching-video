@@ -1,0 +1,85 @@
+{
+  "title": "Most Useful Music Theory for Ukulele",
+  "startNode": "intro",
+  "choiceDisplaySeconds": 8,
+  "masterVideoId": "Jvu5VZVe3MI",
+  "nodes": [
+    {
+      "id": "intro",
+      "title": "intro",
+      "choices": [],
+      "start": 0,
+      "end": 51.6
+    },
+    {
+      "id": "string-names",
+      "title": "string names - acronym",
+      "choices": [],
+      "start": 51.6,
+      "end": 61.3
+    },
+    {
+      "id": "string-names-2",
+      "title": "string names raw",
+      "choices": [],
+      "start": 61.3,
+      "end": 146.3
+    },
+    {
+      "id": "notes-bc-ef",
+      "title": "notes bc ef",
+      "choices": [],
+      "start": 146.3,
+      "end": 188.4
+    },
+    {
+      "id": "g-string-notes",
+      "title": "g string notes",
+      "choices": [],
+      "start": 188.4,
+      "end": 238.7
+    },
+    {
+      "id": "strumming-count",
+      "title": "strumming count",
+      "choices": [],
+      "start": 238.7,
+      "end": 363.8
+    },
+    {
+      "id": "strumming-count-concise",
+      "title": "strumming count concise",
+      "choices": [],
+      "start": 363.8,
+      "end": 399.4
+    },
+    {
+      "id": "major-scale",
+      "title": "major scale",
+      "choices": [],
+      "start": 399.2,
+      "end": 564.6
+    },
+    {
+      "id": "major-scale-concise",
+      "title": "Major scale concise",
+      "choices": [],
+      "start": 564.6,
+      "end": 615.7
+    },
+    {
+      "id": "chords-of-a-key",
+      "title": "chords of a key",
+      "choices": [],
+      "start": 615.7,
+      "end": 785.1
+    },
+    {
+      "id": "chords-of-a-key-concise",
+      "title": "chords of a key concise",
+      "choices": [],
+      "start": 785.1,
+      "end": 806.5
+    }
+  ]
+}
