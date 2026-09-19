@@ -153,15 +153,20 @@ stale-object guard from the slice-2 port). What stays manual is five items in
 [`e2e/README.md`](../e2e/README.md#what-stays-manual). See
 [journal 2026-09-19 (2)](journal/2026-09-19-2-playwright-suite.md).
 
+**2026-09-19 (3) — merged, required, and a first flake fixed.** PR #13 merged; `e2e (playwright)`
+is now a required status check on `main` (seven checks, `strict` unchanged). Renovate #12
+(setup-node) and #14 (eslint) merged too. Renovate #15 (fast-check) went red on
+`e2e (playwright)`, but not because of fast-check: one test navigated away while the save it was
+checking was still being written to IndexedDB, and on the slower CI disk the write was abandoned.
+Three tests had that shape. They now confirm the save in the page (`reopenUntil` in
+`e2e/support/app.ts`) before reloading. The same investigation found a real gap: the Editor's 1 s edit burst
+meant leaving the page right after typing could drop the last edit. The Editor now also flushes
+on `focusout`, with a fake-clock e2e test proving it (it fails with the listener removed). See
+[journal 2026-09-19 (3)](journal/2026-09-19-3-first-e2e-flake.md), `a1d7de4`.
+
 **Next:**
-0. **Ryan: review and merge the PR** (branch `adr-0023-history-and-e2e-suite`: `060f897` + a docs
-   commit, plus the earlier docs fix `8b767fb` that was sitting unpushed on local `main`). To
-   check locally: `pnpm install`, `pnpm exec playwright install chromium` (once), `pnpm e2e`, and
-   60 should pass. Try ⟲ by hand
-   in `pnpm dev` if you want to see it. `main` needs a PR (or the admin bypass). **After the first
-   green CI run on the PR, add `e2e (playwright)` to `main`'s required status checks** (same
-   `gh api` call as 2026-09-18). It isn't required until then, so a PR could merge with it red
-   (though the deploy would still refuse).
+0. **Re-run #15** once this fix is on `main`. `main` requires branches to be up to date, so
+   Renovate will rebase #15 itself (or tick its rebase box), and CI re-runs then.
 1. **The five manual checks** in [`e2e/README.md`](../e2e/README.md#what-stays-manual): real
    YouTube playback feel, Studio against a real video, a real phone, the native Save As dialog,
    and reading `create.html` as a newcomer. That list replaces the long "click through the
@@ -169,7 +174,10 @@ stale-object guard from the slice-2 port). What stays manual is five items in
 2. ~~Slice 3b part 3~~ done 2026-09-18. ~~ADR-0026 (CSP)~~ done 2026-09-18. ~~Branch
    protection, Renovate~~ done 2026-09-18 (a direct `git push` to `main` is rejected without
    the admin bypass).
-3. ~~Slice 4~~: ADR-0024 UI delivered in 3b.3, ADR-0023 built 2026-09-19 (item 0).
+3. ~~Slice 4~~: ADR-0024 UI delivered in 3b.3, ADR-0023 merged 2026-09-19 (PR #13).
+   The Editor's 1 s edit burst left a window where leaving the page right after typing relied on
+   a best-effort `pagehide` flush. It now also flushes on `focusout`, which runs before a link
+   click navigates (2026-09-19 (3)).
 4. After that: **nothing planned is left in the migration.** The "not yet scheduled" lists under
    Worklist are what remains to pick from.
 
