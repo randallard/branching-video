@@ -9,7 +9,10 @@
  * needing to think about it.
  */
 import type { ShowConfig } from "../core/config.ts";
+import type { BackstopEntry } from "./backstop.ts";
+import { writeBackstop } from "./backstop.ts";
 import type { DraftStore } from "./draft-store.ts";
+import { newId } from "./draft-store.ts";
 
 /** One open show. A queued save carries the slot it was queued against, so switching drafts while
  * a save is still pending can't land that save on the newly opened show. */
@@ -18,15 +21,27 @@ interface Slot {
   nodeKeys: (string | null)[];
 }
 
+/** The newest edit to a slot that isn't in IndexedDB yet, and when it was made. */
+interface Unsaved {
+  slot: Slot;
+  config: ShowConfig;
+  at: string;
+}
+
 /** How long typing has to pause before it is written: one event per field per edit burst, not
  * per keystroke (ADR-0007) — which is also what keeps a field's history (ADR-0023) readable. */
 export const EDIT_BURST_MS = 1000;
 
 export class DraftSession {
+  /** Names this session's unload backstop key, so two tabs can't overwrite each other's. */
+  readonly id = newId();
   private slot: Slot = { showId: null, nodeKeys: [] };
   private readonly store: DraftStore;
   private queue: Promise<void> = Promise.resolve();
-  private pending: { slot: Slot; config: ShowConfig; timer: ReturnType<typeof setTimeout> } | null = null;
+  private pending: { edit: Unsaved; timer: ReturnType<typeof setTimeout> } | null = null;
+  private readonly unsaved = new Map<Slot, Unsaved>();
+  private backstopStorage: Storage | null = null;
+  private backstopWritten = false;
   /** Called after every save lands, so a page can refresh what it derives from the log. */
   onSaved: (() => void) | null = null;
 
@@ -55,23 +70,22 @@ export class DraftSession {
     this.slot = { showId: null, nodeKeys: [] };
   }
 
-  /** `create()`s on the first call, `save()`s after; re-syncs `nodeKeys` from the store's
-   * canonical state afterward, since the store — not the page — assigns real node keys. */
+  /** Save now. The first save of a new show creates it; `nodeKeys` is re-synced afterwards. */
   persist(config: ShowConfig): Promise<void> {
     this.cancelPending();
-    return this.enqueue(this.slot, config);
+    return this.enqueue(this.note(config));
   }
 
   /** `persist`, once typing pauses for `EDIT_BURST_MS`. Any other persist, `flush`, `attach` or
    * `reset` writes it straight away instead. */
   persistSoon(config: ShowConfig): void {
     this.cancelPending();
-    const slot = this.slot;
+    const edit = this.note(config);
     const timer = setTimeout(() => {
       this.pending = null;
-      void this.enqueue(slot, config);
+      void this.enqueue(edit);
     }, EDIT_BURST_MS);
-    this.pending = { slot, config, timer };
+    this.pending = { edit, timer };
   }
 
   /** Write a pending `persistSoon` now — before leaving the page, say. */
@@ -79,7 +93,32 @@ export class DraftSession {
     const p = this.pending;
     if (p === null) return this.queue;
     this.cancelPending();
-    return this.enqueue(p.slot, p.config);
+    return this.enqueue(p.edit);
+  }
+
+  /** Park every edit not yet in IndexedDB in `storage`, synchronously (see `backstop.ts`). */
+  useBackstop(storage: Storage): void {
+    this.backstopStorage = storage;
+  }
+
+  writeBackstop(): void {
+    const storage = this.backstopStorage;
+    if (storage === null) return;
+    const entries: BackstopEntry[] = [...this.unsaved.values()].map((u) => {
+      const { showId, nodeKeys } = identify(u.slot);
+      return { showId, nodeKeys: [...nodeKeys], config: JSON.parse(JSON.stringify(u.config)) as ShowConfig, at: u.at };
+    });
+    writeBackstop(storage, this.id, entries);
+    this.backstopWritten = entries.length > 0;
+  }
+
+  /** Record an edit as unsaved, and give its show and any new nodes their ids now, so an
+   * in-flight write and a backstop replay of the same edit agree on identity. */
+  private note(config: ShowConfig): Unsaved {
+    identify(this.slot);
+    const edit = { slot: this.slot, config, at: this.store.peekNow() };
+    this.unsaved.set(this.slot, edit);
+    return edit;
   }
 
   private cancelPending(): void {
@@ -87,22 +126,55 @@ export class DraftSession {
     this.pending = null;
   }
 
-  private enqueue(slot: Slot, config: ShowConfig): Promise<void> {
-    this.queue = this.queue.then(() => this.doPersist(slot, config));
-    return this.queue;
+  /** Chained, so saves land in order. A failed save rejects its own caller but must not wedge the
+   * queue — otherwise one bad write would silently stop every save after it. */
+  private enqueue(edit: Unsaved): Promise<void> {
+    const run = this.queue.then(() => this.doPersist(edit));
+    this.queue = run.catch(() => undefined);
+    return run;
   }
 
-  private async doPersist(slot: Slot, config: ShowConfig): Promise<void> {
-    if (slot.showId === null) {
-      slot.showId = await this.store.create(config);
-    } else {
-      await this.store.save({ showId: slot.showId, config, nodeKeys: slot.nodeKeys });
-    }
+  private async doPersist(edit: Unsaved): Promise<void> {
+    const { showId, nodeKeys } = identify(edit.slot);
+    await this.store.save({ showId, config: edit.config, nodeKeys });
     // In place, not reassigned: a page may hold this array and push to it between saves.
-    const fresh = this.store.open(slot.showId)?.nodeKeys;
-    if (fresh !== undefined) slot.nodeKeys.splice(0, slot.nodeKeys.length, ...fresh);
+    const fresh = this.store.open(showId)?.nodeKeys;
+    if (fresh !== undefined) edit.slot.nodeKeys.splice(0, edit.slot.nodeKeys.length, ...fresh);
+    if (this.unsaved.get(edit.slot) === edit) this.unsaved.delete(edit.slot);
+    if (this.unsaved.size === 0 && this.backstopWritten) this.writeBackstop();
     this.onSaved?.();
   }
+}
+
+/** Fill in a slot's missing ids — the show's, and any node added since the last save. */
+function identify(slot: Slot): { showId: string; nodeKeys: string[] } {
+  slot.showId ??= newId();
+  for (let i = 0; i < slot.nodeKeys.length; i++) slot.nodeKeys[i] ??= newId();
+  return { showId: slot.showId, nodeKeys: slot.nodeKeys as string[] };
+}
+
+/**
+ * Park unsaved edits in `localStorage` whenever the page is hidden or going away (`backstop.ts`),
+ * after starting the ordinary flush. `visibilitychange` covers mobile, where a backgrounded tab can
+ * be killed without `pagehide`; the backstop is written on every hide, which is safe because a
+ * replay never outranks an edit made after it.
+ */
+export function guardAgainstUnload(session: DraftSession): void {
+  let storage: Storage;
+  try {
+    storage = localStorage;
+  } catch {
+    return;
+  }
+  session.useBackstop(storage);
+  const park = (): void => {
+    void session.flush();
+    session.writeBackstop();
+  };
+  window.addEventListener("pagehide", park);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") park();
+  });
 }
 
 export type AdoptOutcome =

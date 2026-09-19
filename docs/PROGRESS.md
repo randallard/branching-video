@@ -164,6 +164,18 @@ meant leaving the page right after typing could drop the last edit. The Editor n
 on `focusout`, with a fake-clock e2e test proving it (it fails with the listener removed). See
 [journal 2026-09-19 (3)](journal/2026-09-19-3-first-e2e-flake.md), `a1d7de4`.
 
+**2026-09-19 (4) — ADR-0028: an unload backstop.** Closing the tab right after typing could
+still lose the last Editor burst (IndexedDB is async; a closing page doesn't wait). Now, whenever
+a page is hidden or unloads, `DraftSession` also writes every edit not yet in IndexedDB to
+`localStorage` synchronously (`bvp:unsaved:<session>`), and the next page to open the store
+replays them through the ordinary diff **at the time each edit was made**, so a stale parked copy
+can never outrank a later edit. Show ids and new node keys are now assigned when the edit is made,
+so a replay of a write that did land adds nothing. Both Editor and Studio are covered. Also fixed
+on the way: one failed save used to wedge the session's save queue for good. Unit-tested (135)
+plus a browser test that makes the closing tab's writes fail; both the key unit test and the
+browser test fail with the mechanism removed. See
+[journal 2026-09-19 (4)](journal/2026-09-19-4-unload-backstop.md).
+
 **Next:**
 0. **Re-run #15** once this fix is on `main`. `main` requires branches to be up to date, so
    Renovate will rebase #15 itself (or tick its rebase box), and CI re-runs then.
@@ -177,7 +189,8 @@ on `focusout`, with a fake-clock e2e test proving it (it fails with the listener
 3. ~~Slice 4~~: ADR-0024 UI delivered in 3b.3, ADR-0023 merged 2026-09-19 (PR #13).
    The Editor's 1 s edit burst left a window where leaving the page right after typing relied on
    a best-effort `pagehide` flush. It now also flushes on `focusout`, which runs before a link
-   click navigates (2026-09-19 (3)).
+   click navigates (2026-09-19 (3)), and parks unsaved edits in `localStorage` on hide/unload for
+   the next page to replay ([ADR-0028](adr/0028-unload-backstop-in-localstorage-replayed-at-edit-time.md)).
 4. After that: **nothing planned is left in the migration.** The "not yet scheduled" lists under
    Worklist are what remains to pick from.
 
@@ -198,6 +211,7 @@ Target state, decided 2026-09-14. Links rather than restatement:
 - Hosting: Pages from the CI artifact (`DEPLOY_PAGES`) — [ADR-0006](adr/0006-pages-deploy-from-ci-build-artifact.md)
 - Storage: IndexedDB append-only event log, event-bundle backups — [ADR-0007](adr/0007-indexeddb-append-only-event-log-storage.md); event model [0008](adr/0008-edit-level-events-per-field-last-writer-wins.md), identity [0009](adr/0009-show-identity-by-generated-id-not-slug.md), legacy import [0011](adr/0011-legacy-drafts-and-backups-import-as-snapshot-events.md)
 - Show file format unchanged (player, `live/`, and cycle-in depend on it) — [ADR-0010](adr/0010-config-json-stays-the-publish-and-interchange-format.md)
+- Unload backstop: unsaved edits parked in `localStorage`, replayed at edit time — [ADR-0028](adr/0028-unload-backstop-in-localstorage-replayed-at-edit-time.md)
 - Browser tests: committed Playwright suite against the built site, hermetic — [ADR-0027](adr/0027-playwright-browser-tests-against-the-built-site.md)
 - Supply chain — ADRs [0012](adr/0012-block-install-time-scripts.md)–[0018](adr/0018-pin-actions-to-commit-shas.md); licence [0019](adr/0019-dual-mit-apache-license.md)
 

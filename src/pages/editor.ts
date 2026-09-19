@@ -6,7 +6,7 @@ import { extractVideoId, slugify, uniqueId } from "../core/text.ts";
 import { validate } from "../core/validate.ts";
 import type { ValidationResult } from "../core/validate.ts";
 import { getTransfer, setTransfer } from "../shell/drafts.ts";
-import { adoptExternalConfig, DraftSession } from "../shell/draft-session.ts";
+import { adoptExternalConfig, DraftSession, guardAgainstUnload } from "../shell/draft-session.ts";
 import type { DraftStore } from "../shell/draft-store.ts";
 import { openDraftStore } from "../shell/draft-store.ts";
 import { errorMessage, readFileText } from "../shell/files.ts";
@@ -1240,13 +1240,8 @@ async function boot(): Promise<void> {
   session.onSaved = () => {
     histories.refresh();
   };
-  // A typing burst still waiting on its pause is written before the tab goes away.
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") void session.flush();
-  });
-  window.addEventListener("pagehide", () => {
-    void session.flush();
-  });
+  // Unsaved edits are flushed, and parked in localStorage, whenever the page hides or goes away.
+  guardAgainstUnload(session);
   // Leaving a field ends its burst. It also runs before a link click navigates (the mousedown
   // blurs the field), which gives the write a head start over the best-effort pagehide flush.
   document.addEventListener("focusout", () => {

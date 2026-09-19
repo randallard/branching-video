@@ -4,7 +4,7 @@ import type { Choice, ShowConfig, ShowNode } from "../core/config.ts";
 import { serialize, toFileText } from "../core/serialize.ts";
 import { escapeHtml, extractVideoId, fmtTime, slugify, uniqueId } from "../core/text.ts";
 import { getTransfer, setTransfer, takeResume } from "../shell/drafts.ts";
-import { adoptExternalConfig, DraftSession } from "../shell/draft-session.ts";
+import { adoptExternalConfig, DraftSession, guardAgainstUnload } from "../shell/draft-session.ts";
 import type { DraftStore } from "../shell/draft-store.ts";
 import { openDraftStore } from "../shell/draft-store.ts";
 import { downloadText, errorMessage, readFileText } from "../shell/files.ts";
@@ -711,6 +711,7 @@ async function boot(): Promise<void> {
   session.onSaved = () => {
     histories.refresh();
   };
+  guardAgainstUnload(session);
   await notifyCollisions(draftStore);
 
   for (const b of setupButtons) b.disabled = false;
