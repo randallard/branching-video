@@ -16,7 +16,13 @@ import type { ShowEvent } from "../core/events.ts";
 import { parseBundle, serializeBundle, unionEvents } from "../core/bundle.ts";
 import type { RemovalCollision, ShowState, ShowsState } from "../core/reduce.ts";
 import { findShow, reduce, toConfig } from "../core/reduce.ts";
-import { migrateLocalDrafts, snapshotEvent } from "../core/migrate.ts";
+import {
+  draftsFromLegacyBackup,
+  migrateLocalDrafts,
+  snapshotEvent,
+  snapshotEventsFromDrafts,
+} from "../core/migrate.ts";
+import type { LegacyBackup } from "../core/legacy-backup.ts";
 import { loadDraftConfig, loadDraftIndex } from "./drafts.ts";
 import type { EventStore } from "./event-store.ts";
 import { openEventStore } from "./event-store.ts";
@@ -225,6 +231,22 @@ export class DraftStore {
   /** Every event, for a caller that wants to merge sets itself. */
   async allEvents(): Promise<readonly ShowEvent[]> {
     return this.store.all();
+  }
+
+  /** Import an old `bvp-backup` bundle as snapshot events (ADR-0011) — each draft lands on the
+   * same deterministic `slug:<slug>` show a `localStorage` migration would have used, so a backup
+   * and the browser it came from never fork. No update-or-add question: unlike a single-show
+   * config file, a legacy draft already has an identity. Returns the event count appended, after
+   * dedup — content-hash ids make re-importing the same backup a no-op. */
+  async importLegacyBackup(backup: LegacyBackup): Promise<number> {
+    const drafts = draftsFromLegacyBackup(backup);
+    const events = snapshotEventsFromDrafts(drafts, this.now());
+    const existing = await this.store.all();
+    const before = existing.length;
+    await this.store.append(events);
+    const after = await this.store.all();
+    this.adopt(after);
+    return after.length - before;
   }
 }
 

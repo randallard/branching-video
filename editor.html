@@ -239,6 +239,10 @@
   <button id="loadBtn">Open…</button>
   <button id="newBtn" title="Start a fresh config — optionally from a YouTube video URL">New…</button>
   <div class="menu-wrap">
+    <button id="myDraftsBtn" title="Open a draft that's autosaved in this browser">My Drafts ▾</button>
+    <div class="dropdown" id="myDraftsMenu" hidden></div>
+  </div>
+  <div class="menu-wrap">
     <button id="configsBtn" title="Browse config files in the live configs/ folder and open one in the player.">Configs ▾</button>
     <div class="dropdown" id="configsMenu" hidden></div>
   </div>
@@ -246,7 +250,7 @@
   <button id="playerBtn" title="Opens player.html for the selected node. Uses the config.json saved on disk, not this unsaved draft.">Play current ↗</button>
   <button id="studioBtn" title="Open this draft in Studio, the timeline-based editor">Open in Studio ✦</button>
   <button id="copyBtn">Copy JSON</button>
-  <button id="saveBtn" class="primary">Save As…</button>
+  <button id="saveBtn" class="primary" title="Every edit already autosaves in this browser — this writes a real file, e.g. to publish to public/live/">Export As…</button>
 </header>
 
 <div id="mobile-drawer" role="dialog" aria-modal="true" aria-label="Menu">
@@ -257,7 +261,8 @@
   <div id="mobile-drawer-actions">
     <button id="mobileLoadBtn">Open…</button>
     <button id="mobileNewBtn">New…</button>
-    <button id="mobileSaveBtn" class="primary">Save As…</button>
+    <button id="mobileMyDraftsBtn">My Drafts…</button>
+    <button id="mobileSaveBtn" class="primary">Export As…</button>
     <button id="mobilePlayerBtn">Play ↗</button>
   </div>
   <div id="mobile-drawer-body">

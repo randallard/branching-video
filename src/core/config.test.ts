@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { normalizeConfig } from "./config.ts";
-import { serializeEditor, serializeStudio } from "./serialize.ts";
+import { serialize } from "./serialize.ts";
 import { validate } from "./validate.ts";
 import { arbitraryConfig } from "./arbitraries.test-util.ts";
 
@@ -29,11 +29,10 @@ describe("normalizeConfig", () => {
     );
   });
 
-  it("keeps a real export intact through both serializers", () => {
+  it("keeps a real export intact through serialize", () => {
     const cfg = normalizeConfig(ukulele);
     expect(cfg).not.toBeNull();
-    expect(serializeStudio(cfg!)).toEqual(ukulele);
-    expect(serializeEditor(cfg!)).toEqual(ukulele);
+    expect(serialize(cfg!)).toEqual(ukulele);
   });
 
   it("drops underscore notes and wrongly-typed values", () => {
@@ -51,30 +50,28 @@ describe("normalizeConfig", () => {
   });
 });
 
-describe("serializers", () => {
-  it("are stable: serialize(normalize(serialize(c))) equals serialize(c)", () => {
+describe("serialize", () => {
+  it("is stable: serialize(normalize(serialize(c))) equals serialize(c)", () => {
     fc.assert(
       fc.property(arbitraryConfig, (c) => {
-        for (const ser of [serializeStudio, serializeEditor]) {
-          const once = ser(c);
-          const again = ser(normalizeConfig(JSON.parse(JSON.stringify(once)))!);
-          expect(again).toEqual(once);
-        }
+        const once = serialize(c);
+        const again = serialize(normalizeConfig(JSON.parse(JSON.stringify(once)))!);
+        expect(again).toEqual(once);
       })
     );
   });
 
-  it("never emit underscore or undefined fields", () => {
+  it("never emits underscore or undefined fields", () => {
     fc.assert(
       fc.property(arbitraryConfig, (c) => {
         const keys: string[] = [];
-        const text = JSON.stringify(serializeEditor(c), (k, v: unknown) => {
+        const text = JSON.stringify(serialize(c), (k, v: unknown) => {
           keys.push(k);
           return v;
         });
         expect(keys.filter((k) => k.startsWith("_"))).toEqual([]);
         // JSON.stringify drops undefined-valued keys, so a lossless round trip means none.
-        expect(JSON.parse(text)).toStrictEqual(serializeEditor(c));
+        expect(JSON.parse(text)).toStrictEqual(serialize(c));
       })
     );
   });
@@ -82,11 +79,33 @@ describe("serializers", () => {
   it("validation sees the same errors in a config and its serialization", () => {
     fc.assert(
       fc.property(arbitraryConfig, (c) => {
-        const ser = serializeEditor(c);
+        const ser = serialize(c);
         expect(validate(ser).errors).toEqual(
-          validate(JSON.parse(JSON.stringify(serializeEditor(normalizeConfig(ser)!)))).errors
+          validate(JSON.parse(JSON.stringify(serialize(normalizeConfig(ser)!)))).errors
         );
       })
     );
+  });
+
+  it("always writes choiceDisplaySeconds, defaulting to 8", () => {
+    const cfg = normalizeConfig({ title: "t", startNode: "a", nodes: [{ id: "a", choices: [] }] });
+    expect(serialize(cfg!).choiceDisplaySeconds).toBe(8);
+    const withValue = normalizeConfig({ ...cfg, choiceDisplaySeconds: 12 });
+    expect(serialize(withValue!).choiceDisplaySeconds).toBe(12);
+  });
+
+  it("normalizes an endScreen link to exactly one of url or target", () => {
+    const cfg = normalizeConfig({
+      title: "t",
+      startNode: "a",
+      nodes: [
+        {
+          id: "a",
+          choices: [],
+          endScreen: { links: [{ label: "both", url: "https://x", target: "a" }] },
+        },
+      ],
+    });
+    expect(serialize(cfg!).nodes[0]?.endScreen?.links[0]).toEqual({ label: "both", url: "https://x" });
   });
 });

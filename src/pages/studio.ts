@@ -1,39 +1,18 @@
 // Studio: mark node timestamps against one master video while watching it.
 import { isLegacyBackup, normalizeConfig } from "../core/config.ts";
 import type { Choice, ShowConfig, ShowNode } from "../core/config.ts";
-import { serializeStudio, toFileText } from "../core/serialize.ts";
+import { serialize, toFileText } from "../core/serialize.ts";
 import { escapeHtml, extractVideoId, fmtTime, slugify, uniqueId } from "../core/text.ts";
-import {
-  getTransfer,
-  loadDraftConfig,
-  loadDraftIndex,
-  saveDraftConfig,
-  saveDraftIndex,
-  setTransfer,
-  takeResume,
-} from "../shell/drafts.ts";
+import { getTransfer, setTransfer, takeResume } from "../shell/drafts.ts";
+import { adoptExternalConfig, DraftSession } from "../shell/draft-session.ts";
+import type { DraftStore } from "../shell/draft-store.ts";
+import { openDraftStore } from "../shell/draft-store.ts";
 import { downloadText, errorMessage, readFileText } from "../shell/files.ts";
+import { notifyCollisions } from "../ui/collisions.ts";
 import { fetchVideoTitle } from "../shell/shows.ts";
 import { YT_STATE, loadYouTubeApi } from "../shell/youtube.ts";
 import type { YTPlayer } from "../shell/youtube.ts";
 import { button, byId, input, valueOf, checkedOf } from "../ui/dom.ts";
-
-// ── Storage ─────────────────────────────────────────────────────────────────
-function saveToLS(cfg: ShowConfig): string {
-  const s = slugify(cfg.title || "untitled", "untitled");
-  saveDraftConfig(s, cfg);
-  const idx = loadDraftIndex();
-  const existing = idx.findIndex((e) => e.slug === s);
-  const entry = { slug: s, title: cfg.title || "Untitled", modified: Date.now() };
-  if (existing >= 0) idx[existing] = entry;
-  else idx.push(entry);
-  saveDraftIndex(idx);
-  return s;
-}
-
-function loadFromLS(s: string): ShowConfig | null {
-  return normalizeConfig(loadDraftConfig(s));
-}
 
 // ── State ────────────────────────────────────────────────────────────────────
 let config: ShowConfig | null = null; // the working config object
@@ -41,6 +20,8 @@ let selectedId: string | null = null;
 let ytPlayer: YTPlayer | null = null;
 let ytReady = false;
 let tcInterval: ReturnType<typeof setInterval> | null = null;
+let draftStore: DraftStore;
+let session: DraftSession;
 
 // ── Setup screen ─────────────────────────────────────────────────────────────
 const $setup = byId("setup");
@@ -64,13 +45,14 @@ button("startBtn").addEventListener("click", () => {
     choiceDisplaySeconds: countdown,
     nodes: [],
   };
+  session.reset();
   config = fresh;
   // async title fetch — update if field was blank
   if (!title) {
     void fetchVideoTitle(id).then((t) => {
       if (t && config === fresh) {
         fresh.title = t;
-        autoSave();
+        void autoSave();
         setStatusLabel();
       }
     });
@@ -78,8 +60,10 @@ button("startBtn").addEventListener("click", () => {
   enterWorkspace();
 });
 
-// Take an existing config object (import / transfer) into the workspace.
-function adoptConfig(raw: unknown): boolean {
+// Take an existing config object (import / transfer / "Import config JSON…") into the workspace.
+// Goes through the same update-or-add path as the home page's Import All (ADR-0011) instead of
+// autosaving straight over a same-titled draft.
+async function adoptConfig(raw: unknown): Promise<boolean> {
   if (isLegacyBackup(raw)) {
     showSetupError(
       'That is a full backup file — import it from the home page ("Import All"), then use Resume draft… here.'
@@ -97,8 +81,14 @@ function adoptConfig(raw: unknown): boolean {
     );
     return false;
   }
+  const outcome = await adoptExternalConfig(draftStore, cfg);
+  if (!outcome.ok) {
+    showSetupError(outcome.reason);
+    return false;
+  }
   $setupErr.style.display = "none";
-  config = cfg;
+  session.attach(outcome.showId, outcome.nodeKeys);
+  config = outcome.config;
   enterWorkspace();
   return true;
 }
@@ -115,9 +105,9 @@ input("importFile").addEventListener("change", () => {
   const el = input("importFile");
   const file = el.files?.[0];
   if (!file) return;
-  void readFileText(file).then((text) => {
+  void readFileText(file).then(async (text) => {
     try {
-      adoptConfig(JSON.parse(text));
+      await adoptConfig(JSON.parse(text));
     } catch (err) {
       showSetupError("Could not parse JSON: " + errorMessage(err));
     }
@@ -131,32 +121,34 @@ button("newBtn").addEventListener("click", () => {
 });
 
 button("resumeBtn").addEventListener("click", () => {
-  const idx = loadDraftIndex();
-  if (!idx.length) {
+  const list = draftStore.list();
+  if (!list.length) {
     alert("No saved drafts found.");
     return;
   }
-  const opts = idx
-    .map((e, i) => `${String(i + 1)}: ${e.title} (${new Date(e.modified).toLocaleDateString()})`)
+  const opts = list
+    .map((s, i) => `${String(i + 1)}: ${s.title} (${new Date(s.updatedAt).toLocaleDateString()})`)
     .join("\n");
   const ans = prompt("Choose a draft (enter number):\n" + opts);
   if (ans === null) return;
   const i = parseInt(ans, 10) - 1;
-  const entry = idx[i];
+  const entry = list[i];
   if (Number.isNaN(i) || !entry) {
     alert("Invalid choice.");
     return;
   }
-  const saved = loadFromLS(entry.slug);
-  if (!saved) {
+  const working = draftStore.open(entry.showId);
+  if (!working) {
     alert("Could not load draft.");
     return;
   }
-  config = saved;
+  session.attach(entry.showId, working.nodeKeys);
+  config = working.config;
   enterWorkspace();
 });
 
 function resetToSetup(): void {
+  session.reset();
   config = null;
   selectedId = null;
   stopTcInterval();
@@ -172,15 +164,15 @@ function enterWorkspace(): void {
   $setup.style.display = "none";
   $workspace.classList.add("visible");
   for (const b of headerButtons) b.disabled = false;
-  autoSave();
+  void autoSave();
   loadYouTubeApi(onYTReady);
   renderTable();
   renderSidebar();
 }
 
-function autoSave(): void {
+async function autoSave(): Promise<void> {
   if (!config) return;
-  saveToLS(config);
+  await session.persist(config);
   setStatusLabel("Saved");
 }
 
@@ -289,9 +281,10 @@ function markStart(): void {
   if (rawTitle === null) return; // cancelled
   const id = uniqueId(slugify(rawTitle || "node", "untitled"), ids);
   config.nodes.push({ id, title: rawTitle || id, start: t, choices: [] });
+  session.nodeKeys.push(null);
   if (!config.startNode) config.startNode = id;
   selectedId = id;
-  autoSave();
+  void autoSave();
   renderTable();
   renderSidebar();
   button("setEndBtn").disabled = false;
@@ -301,7 +294,7 @@ function setEndNow(): void {
   const node = selectedNode();
   if (!node) return;
   node.end = parseFloat(currentTime().toFixed(1));
-  autoSave();
+  void autoSave();
   renderTable();
   renderSidebar();
 }
@@ -383,7 +376,7 @@ function renderSidebar(): void {
         if (cfg.startNode === node.id) cfg.startNode = v;
         node.id = v;
         selectedId = v;
-        autoSave();
+        void autoSave();
         renderTable();
         renderSidebar();
       }),
@@ -397,7 +390,7 @@ function renderSidebar(): void {
       "Title",
       mkInput("text", node.title || "", (v) => {
         node.title = v;
-        autoSave();
+        void autoSave();
         renderTable();
       })
     )
@@ -411,7 +404,7 @@ function renderSidebar(): void {
       "Start (s)",
       mkInput("number", node.start ?? "", (v) => {
         node.start = v === "" ? undefined : parseFloat(v);
-        autoSave();
+        void autoSave();
         renderTable();
       })
     )
@@ -421,7 +414,7 @@ function renderSidebar(): void {
       "End (s)",
       mkInput("number", node.end ?? "", (v) => {
         node.end = v === "" ? undefined : parseFloat(v);
-        autoSave();
+        void autoSave();
         renderTable();
       })
     )
@@ -437,7 +430,7 @@ function renderSidebar(): void {
         node.returnTo || "",
         (v) => {
           node.returnTo = v || undefined;
-          autoSave();
+          void autoSave();
         }
       ),
       "Auto-route here when segment ends."
@@ -457,7 +450,7 @@ function renderSidebar(): void {
   addChoiceBtn.textContent = "+ Add choice";
   addChoiceBtn.addEventListener("click", () => {
     node.choices.push({ label: "", target: "", default: false });
-    autoSave();
+    void autoSave();
     renderSidebar();
   });
   $body.appendChild(addChoiceBtn);
@@ -477,7 +470,7 @@ function mkChoiceItem(cfg: ShowConfig, node: ShowNode, c: Choice, idx: number): 
   del.textContent = "✕";
   del.addEventListener("click", () => {
     node.choices.splice(idx, 1);
-    autoSave();
+    void autoSave();
     renderTable();
     renderSidebar();
   });
@@ -492,7 +485,7 @@ function mkChoiceItem(cfg: ShowConfig, node: ShowNode, c: Choice, idx: number): 
       "Label",
       mkInput("text", c.label || "", (v) => {
         c.label = v;
-        autoSave();
+        void autoSave();
       })
     )
   );
@@ -501,7 +494,7 @@ function mkChoiceItem(cfg: ShowConfig, node: ShowNode, c: Choice, idx: number): 
   const targetIds = cfg.nodes.filter((x) => x.id !== node.id).map((x): [string, string] => [x.id, x.id]);
   const targetSel = mkSelect([["", "— select —"], ...targetIds], c.target || "", (v) => {
     c.target = v;
-    autoSave();
+    void autoSave();
     renderTable();
     renderSidebar();
   });
@@ -525,7 +518,7 @@ function mkChoiceItem(cfg: ShowConfig, node: ShowNode, c: Choice, idx: number): 
   cb.addEventListener("change", (e) => {
     if (checkedOf(e)) node.choices.forEach((x, k) => (x.default = k === idx));
     else c.default = false;
-    autoSave();
+    void autoSave();
     renderSidebar();
   });
   defCheck.appendChild(cb);
@@ -543,7 +536,7 @@ function mkChoiceItem(cfg: ShowConfig, node: ShowNode, c: Choice, idx: number): 
     c.style || "",
     (v) => {
       c.style = v || undefined;
-      autoSave();
+      void autoSave();
     }
   );
   defRow.appendChild(mkField("Style", styleSel));
@@ -595,26 +588,27 @@ function mkSelect(options: [string, string][], value: string, onchange: (v: stri
 
 // ── Header actions ────────────────────────────────────────────────────────────
 button("saveBtn").addEventListener("click", () => {
-  autoSave();
-  alert("Saved to browser storage.");
+  void autoSave().then(() => {
+    alert("Saved to browser storage.");
+  });
 });
 
 button("editBtn").addEventListener("click", () => {
   if (!config) return;
-  setTransfer(serializeStudio(config));
+  setTransfer(serialize(config));
   window.open("editor.html#transfer", "_blank");
 });
 
 button("playBtn").addEventListener("click", () => {
   if (!config) return;
-  setTransfer(serializeStudio(config));
+  setTransfer(serialize(config));
   const hash = config.startNode ? "#" + config.startNode : "";
   window.open("player.html?config=transfer" + hash, "_blank");
 });
 
 button("exportBtn").addEventListener("click", () => {
   if (!config) return;
-  downloadText(slugify(config.title || "config", "untitled") + ".json", toFileText(serializeStudio(config)));
+  downloadText(slugify(config.title || "config", "untitled") + ".json", toFileText(serialize(config)));
 });
 
 button("deleteNodeBtn").addEventListener("click", () => {
@@ -622,33 +616,49 @@ button("deleteNodeBtn").addEventListener("click", () => {
   const node = selectedNode();
   if (!node) return;
   if (!confirm('Delete node "' + node.id + '"?')) return;
+  const idx = config.nodes.findIndex((n) => n.id === selectedId);
   config.nodes = config.nodes.filter((n) => n.id !== selectedId);
+  if (idx >= 0) session.nodeKeys.splice(idx, 1);
   if (config.startNode === selectedId) config.startNode = config.nodes[0]?.id || "";
   selectedId = config.nodes[0]?.id || null;
-  autoSave();
+  void autoSave();
   renderTable();
   renderSidebar();
 });
 
 // ── Boot: check for a previous session ───────────────────────────────────────
-(function boot(): void {
-  if (!loadDraftIndex().length) button("resumeBtn").disabled = true;
+// The store opens asynchronously (IndexedDB), so the setup screen's buttons — enabled by default
+// in the HTML — are disabled synchronously here, before the first `await`, so a click can't land
+// while `draftStore`/`session` are still unset.
+const setupButtons = ["newBtn", "resumeBtn", "startBtn", "importBtn"].map(button);
+for (const b of setupButtons) b.disabled = true;
+
+async function boot(): Promise<void> {
+  draftStore = await openDraftStore();
+  session = new DraftSession(draftStore);
+  await notifyCollisions(draftStore);
+
+  for (const b of setupButtons) b.disabled = false;
+  if (!draftStore.list().length) button("resumeBtn").disabled = true;
 
   // If another page handed us a config (e.g. editor "Open in Studio"), consume the transfer
   // key from localStorage — same convention as the editor.
   if (location.hash === "#transfer") {
     history.replaceState(null, "", location.pathname + location.search);
     const raw = getTransfer();
-    if (raw !== null && adoptConfig(raw)) return;
+    if (raw !== null && (await adoptConfig(raw))) return;
   }
 
   // If the home page sent us a specific draft to resume, load it immediately.
-  const resumeSlug = takeResume();
-  if (resumeSlug) {
-    const saved = loadFromLS(resumeSlug);
-    if (saved) {
-      config = saved;
+  const resumeId = takeResume();
+  if (resumeId) {
+    const working = draftStore.open(resumeId);
+    if (working) {
+      session.attach(resumeId, working.nodeKeys);
+      config = working.config;
       enterWorkspace();
     }
   }
-})();
+}
+
+void boot();

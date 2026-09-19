@@ -1,13 +1,17 @@
 // Editor: form-based editing of a whole show config, with live validation.
 import { isRecord, normalizeConfig } from "../core/config.ts";
 import type { Choice, EndLink, ShowConfig, ShowNode } from "../core/config.ts";
-import { serializeEditor, toFileText } from "../core/serialize.ts";
+import { serialize as serializeConfig, toFileText } from "../core/serialize.ts";
 import { extractVideoId, slugify, uniqueId } from "../core/text.ts";
 import { validate } from "../core/validate.ts";
 import type { ValidationResult } from "../core/validate.ts";
 import { getTransfer, setTransfer } from "../shell/drafts.ts";
+import { adoptExternalConfig, DraftSession } from "../shell/draft-session.ts";
+import type { DraftStore } from "../shell/draft-store.ts";
+import { openDraftStore } from "../shell/draft-store.ts";
 import { errorMessage, readFileText } from "../shell/files.ts";
 import { SHOWS_DIR, fetchShows, fetchVideoTitle } from "../shell/shows.ts";
+import { notifyCollisions } from "../ui/collisions.ts";
 import { button, byId, checkedOf, el, input, valueOf } from "../ui/dom.ts";
 
 // ---- File System Access API (Chromium) — not in TypeScript's DOM lib ------------------------
@@ -34,10 +38,22 @@ let config: ShowConfig = blankConfig();
 let selectedId: string | null = null;
 let fileName = "config.json";
 let fileHandle: FileSystemFileHandle | null = null; // when the browser supports FSA
-let dirty = false;
+let draftStore: DraftStore;
+let session: DraftSession;
 
 function blankConfig(): ShowConfig {
   return { title: "Untitled Show", startNode: "", choiceDisplaySeconds: 8, masterVideoId: "", nodes: [] };
+}
+
+/** A file without a nodes array still opens (as a config with no nodes), as it always has —
+ * the Editor's established, permissive "load whatever JSON was given" behaviour. */
+function normalizeLoose(obj: unknown): ShowConfig {
+  const cfg =
+    normalizeConfig(obj) ??
+    normalizeConfig({ ...blankConfig(), ...(isRecord(obj) ? obj : {}), nodes: [] }) ??
+    blankConfig();
+  if (typeof cfg.choiceDisplaySeconds !== "number") cfg.choiceDisplaySeconds = 8;
+  return cfg;
 }
 
 function nodeIds(): string[] {
@@ -65,7 +81,7 @@ function renameNode(oldId: string, newId: string): boolean {
   return true;
 }
 
-const serialize = (): ShowConfig => serializeEditor(config);
+const serialize = (): ShowConfig => serializeConfig(config);
 
 function field(labelText: string, control: HTMLElement, hint?: string): HTMLElement {
   return el("div", { class: "field" }, [
@@ -80,18 +96,29 @@ function numOrUndefined(v: string): number | undefined {
   return Number.isNaN(n) ? undefined : n;
 }
 
-// ---- render: lightweight (edit) vs structural ------------------------------------------------
-function onEdit(): void {
-  dirty = true;
-  renderNodeList();
-  runValidation();
+// ---- render: lightweight (edit) vs structural, plus persisting the edit ----------------------
+/** Every real edit ends here — autosaves into the draft store, draft-first like Studio. Load
+ * paths (loadConfig/adoptConfig/openDraft) render without calling this: opening a page, or a
+ * config already saved by import, must not itself spawn a new draft. */
+async function persistNow(): Promise<void> {
+  await session.persist(config);
 }
-function structural(): void {
-  dirty = true;
+
+function renderAll(): void {
   renderShowSettings();
   renderNodeList();
   renderForm();
   runValidation();
+}
+
+function onEdit(): void {
+  renderNodeList();
+  runValidation();
+  void persistNow();
+}
+function structural(): void {
+  renderAll();
+  void persistNow();
 }
 
 // ---- show settings --------------------------------------------------------------------------
@@ -124,6 +151,7 @@ function renderShowSettings(): void {
           value: config.title || "",
           oninput: (e) => {
             config.title = valueOf(e);
+            void persistNow();
           },
         })
       )
@@ -140,6 +168,7 @@ function renderShowSettings(): void {
             oninput: (e) => {
               config.choiceDisplaySeconds = numOrUndefined(valueOf(e));
               runValidation();
+              void persistNow();
             },
           })
         ),
@@ -155,6 +184,7 @@ function renderShowSettings(): void {
           oninput: (e) => {
             config.masterVideoId = valueOf(e);
             runValidation();
+            void persistNow();
           },
         }),
         "Default for nodes without their own videoId."
@@ -217,6 +247,7 @@ function currentErrorNodeIds(): Set<string> {
 function addNode(): void {
   const n: ShowNode = { id: uniqueId("node", nodeIds()), title: "", choices: [] };
   config.nodes.push(n);
+  session.nodeKeys.push(null);
   selectedId = n.id;
   if (!config.startNode) config.startNode = n.id;
   structural();
@@ -227,6 +258,7 @@ function deleteNode(id: string): void {
   if (idx < 0) return;
   if (!confirm('Delete node "' + id + '"? References to it will become broken targets.')) return;
   config.nodes.splice(idx, 1);
+  session.nodeKeys.splice(idx, 1);
   const first = config.nodes[0];
   if (config.startNode === id) config.startNode = first ? first.id : "";
   if (selectedId === id) selectedId = first ? first.id : null;
@@ -262,6 +294,7 @@ function numberInput(value: number | undefined, set: (v: number | undefined) => 
     oninput: (e) => {
       set(numOrUndefined(valueOf(e)));
       runValidation();
+      void persistNow();
     },
   });
 }
@@ -314,6 +347,7 @@ function renderForm(): void {
         oninput: (e) => {
           n.videoId = valueOf(e);
           runValidation();
+          void persistNow();
         },
       }),
       "Overrides the master video for this node. Leave blank to use the master."
@@ -340,12 +374,14 @@ function renderForm(): void {
     checkbox("Default aside — show persistent “Skip → back to main” button", !!n.defaultAside, (v) => {
       n.defaultAside = v;
       runValidation();
+      void persistNow();
     })
   );
   routing.appendChild(
     checkbox("Return at current time — resume the branch point on exit", !!n.returnAtCurrentTime, (v) => {
       n.returnAtCurrentTime = v;
       runValidation();
+      void persistNow();
     })
   );
   routing.appendChild(
@@ -374,6 +410,7 @@ function renderForm(): void {
           n.choices.push({ label: "", target: "" });
           renderForm();
           runValidation();
+          void persistNow();
         },
       },
       ["+ Add choice"]
@@ -388,6 +425,7 @@ function renderForm(): void {
       n.endScreen = v ? { heading: "", body: "", links: [] } : undefined;
       renderForm();
       runValidation();
+      void persistNow();
     })
   );
   const es = n.endScreen;
@@ -400,6 +438,7 @@ function renderForm(): void {
           value: es.heading || "",
           oninput: (e) => {
             es.heading = valueOf(e);
+            void persistNow();
           },
         })
       )
@@ -412,6 +451,7 @@ function renderForm(): void {
           {
             oninput: (e) => {
               es.body = valueOf(e);
+              void persistNow();
             },
           },
           [es.body || ""]
@@ -428,6 +468,7 @@ function renderForm(): void {
             es.links.push({ label: "" });
             renderForm();
             runValidation();
+            void persistNow();
           },
         },
         ["+ Add link"]
@@ -482,6 +523,7 @@ function renderChoice(n: ShowNode, c: Choice, idx: number): HTMLElement {
           arr[j] = a;
           renderForm();
           runValidation();
+          void persistNow();
         },
       },
       [dir < 0 ? "▲" : "▼"]
@@ -494,6 +536,7 @@ function renderChoice(n: ShowNode, c: Choice, idx: number): HTMLElement {
       else c.default = false;
       renderForm();
       runValidation();
+      void persistNow();
     },
   });
   if (c.default) defInput.checked = true;
@@ -503,6 +546,7 @@ function renderChoice(n: ShowNode, c: Choice, idx: number): HTMLElement {
     {
       onchange: (e) => {
         c.style = valueOf(e) || undefined;
+        void persistNow();
       },
     },
     [
@@ -527,6 +571,7 @@ function renderChoice(n: ShowNode, c: Choice, idx: number): HTMLElement {
             n.choices.splice(idx, 1);
             renderForm();
             runValidation();
+            void persistNow();
           },
         },
         ["✕"]
@@ -541,6 +586,7 @@ function renderChoice(n: ShowNode, c: Choice, idx: number): HTMLElement {
           oninput: (e) => {
             c.label = valueOf(e);
             runValidation();
+            void persistNow();
           },
         })
       ),
@@ -576,6 +622,7 @@ function renderLink(links: EndLink[], l: EndLink, idx: number): HTMLElement {
             links.splice(idx, 1);
             renderForm();
             runValidation();
+            void persistNow();
           },
         },
         ["✕"]
@@ -588,6 +635,7 @@ function renderLink(links: EndLink[], l: EndLink, idx: number): HTMLElement {
         value: l.label || "",
         oninput: (e) => {
           l.label = valueOf(e);
+          void persistNow();
         },
       })
     ),
@@ -612,6 +660,7 @@ function renderLink(links: EndLink[], l: EndLink, idx: number): HTMLElement {
             l.url = v || undefined;
             if (v) l.target = undefined;
             runValidation();
+            void persistNow();
           },
         }),
         "Use instead of target"
@@ -646,23 +695,20 @@ function runValidation(): void {
 }
 
 // ---- load / save ----------------------------------------------------------------------------
+/** A config with no identity yet in the draft store: a blank/example starting point, not
+ * something the person has told the app to adopt. Renders but does not persist — persisting here
+ * would spawn a fresh draft on every visit to the page. The first real edit creates it, via
+ * `structural()`/`onEdit()`'s own `persistNow()` and `session`'s create-on-first-persist. */
 function loadConfig(obj: unknown, name?: string): void {
-  // A file without a nodes array still opens (as a config with no nodes), as it always has.
-  config =
-    normalizeConfig(obj) ??
-    normalizeConfig({ ...blankConfig(), ...(isRecord(obj) ? obj : {}), nodes: [] }) ??
-    blankConfig();
-  if (typeof config.choiceDisplaySeconds !== "number") config.choiceDisplaySeconds = 8;
+  config = normalizeLoose(obj);
   selectedId = config.nodes[0]?.id ?? null;
   fileHandle = null; // loaded by value; openFile() reattaches a handle if it has one
-  dirty = false;
+  session.reset();
   if (name) {
     fileName = name;
     setFilename(name);
   }
-  // structural() marks the draft dirty, so a freshly loaded file already counts as unsaved —
-  // pre-existing behaviour, kept in this port and listed in docs/PROGRESS.md.
-  structural();
+  renderAll();
   updateSaveLabel();
 }
 
@@ -670,8 +716,11 @@ function setFilename(label: string): void {
   byId("filename").textContent = label || "";
 }
 
+// Every edit already autosaves into the browser draft store (see persistNow); Export/Export As…
+// is the separate, explicit action that writes a real file — the one publishing to
+// public/live/ still needs.
 function updateSaveLabel(): void {
-  const label = fileHandle || fileName !== "config.json" ? "Save" : "Save As…";
+  const label = fileHandle || fileName !== "config.json" ? "Export" : "Export As…";
   button("saveBtn").textContent = label;
   button("mobileSaveBtn").textContent = label;
 }
@@ -682,14 +731,13 @@ async function writeHandle(handle: FileSystemFileHandle, text: string): Promise<
   await w.close();
 }
 
-// Save — writes back to the open file handle if we have one, otherwise Save As.
+// Export — writes back to the open file handle if we have one, otherwise Export As.
 async function save(): Promise<void> {
   if (fileHandle) {
     try {
       await writeHandle(fileHandle, toFileText(serialize()));
-      setFilename(fileName + " · saved");
-      dirty = false;
-      flash("saveBtn", "Saved!");
+      setFilename(fileName + " · exported");
+      flash("saveBtn", "Exported!");
       return;
     } catch (e) {
       if (isAbort(e)) return;
@@ -701,7 +749,7 @@ async function save(): Promise<void> {
   await saveAs();
 }
 
-// Save As… — name the file in-app (works identically in every browser), then save it. Where it
+// Export As… — name the file in-app (works identically in every browser), then save it. Where it
 // lands is up to the browser's download setting: enable "ask where to save each file" to get a
 // folder chooser; otherwise it goes to Downloads. (A native folder+name "Save As" dialog from a
 // web page requires the File System Access API, which not every browser implements well.)
@@ -716,7 +764,7 @@ function fsaSaveWorks(): boolean {
 
 async function saveAs(): Promise<void> {
   const text = toFileText(serialize());
-  const entered = prompt("Save as — file name:", fileName || "config.json");
+  const entered = prompt("Export as — file name:", fileName || "config.json");
   if (entered === null) return; // cancelled
   let name = entered.trim() || "config.json";
   if (!/\.json$/i.test(name)) name += ".json";
@@ -730,10 +778,9 @@ async function saveAs(): Promise<void> {
       await writeHandle(handle, text);
       fileHandle = handle;
       fileName = handle.name;
-      setFilename(fileName + " · saved");
-      dirty = false;
+      setFilename(fileName + " · exported");
       updateSaveLabel();
-      flash("saveBtn", "Saved!");
+      flash("saveBtn", "Exported!");
       return;
     } catch (e) {
       if (isAbort(e)) return; // user cancelled the picker
@@ -749,21 +796,19 @@ async function saveAs(): Promise<void> {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
-  dirty = false;
   updateSaveLabel();
-  flash("saveBtn", "Saved ↓");
+  flash("saveBtn", "Exported ↓");
 }
 
 // Open… — prefer the FSA open picker (keeps a handle for save-back), else the classic hidden
 // file input.
 async function openFile(): Promise<void> {
-  if (!confirmDiscard()) return;
   if (fsa.showOpenFilePicker) {
     try {
       const [handle] = await fsa.showOpenFilePicker({ types: JSON_PICKER_TYPES });
       if (!handle) return;
       const file = await handle.getFile();
-      loadConfig(JSON.parse(await file.text()), file.name);
+      await adoptConfig(JSON.parse(await file.text()), file.name);
       fileHandle = handle;
       updateSaveLabel();
       return;
@@ -774,6 +819,76 @@ async function openFile(): Promise<void> {
     }
   }
   input("fileInput").click();
+}
+
+// ---- adopt a config from outside (file open / #transfer / "Import config JSON…") ------------
+// Goes through the store's update-or-add question (ADR-0011) instead of just loading it into
+// memory, since the config is already persisted (importConfig) by the time this returns.
+async function adoptConfig(raw: unknown, name?: string): Promise<void> {
+  const cfg = normalizeLoose(raw);
+  const outcome = await adoptExternalConfig(draftStore, cfg);
+  if (!outcome.ok) {
+    alert(outcome.reason);
+    return;
+  }
+  session.attach(outcome.showId, outcome.nodeKeys);
+  config = outcome.config;
+  selectedId = config.nodes[0]?.id ?? null;
+  fileHandle = null;
+  if (name) {
+    fileName = name;
+    setFilename(name);
+  }
+  renderAll();
+  updateSaveLabel();
+}
+
+// ---- My Drafts menu (drafts in the browser's event-log store) -------------------------------
+function closeMyDraftsMenu(): void {
+  byId("myDraftsMenu").hidden = true;
+}
+
+function openMyDraftsMenu(): void {
+  const menu = byId("myDraftsMenu");
+  menu.hidden = false;
+  menu.innerHTML = "";
+  menu.appendChild(
+    el("div", { class: "dd-head" }, [el("span", { class: "mini", text: "Open a draft you've been editing" })])
+  );
+  const list = draftStore.list();
+  if (!list.length) {
+    menu.appendChild(el("div", { class: "dd-empty", text: "No drafts yet — start editing to create one." }));
+    return;
+  }
+  for (const s of list) {
+    menu.appendChild(
+      el(
+        "button",
+        {
+          class: "dd-item",
+          title: "Open " + s.title,
+          onclick: () => {
+            openDraft(s.showId);
+            closeMyDraftsMenu();
+          },
+        },
+        [s.title || "(untitled)"]
+      )
+    );
+  }
+}
+
+function openDraft(showId: string): void {
+  const working = draftStore.open(showId);
+  if (!working) return;
+  session.attach(showId, working.nodeKeys);
+  config = working.config;
+  selectedId = config.nodes[0]?.id ?? null;
+  fileHandle = null;
+  fileName = slugify(config.title || "config", "untitled") + ".json";
+  setFilename(config.title || "Untitled draft");
+  renderAll();
+  updateSaveLabel();
 }
 
 // ---- Configs menu (published shows, from live/manifest.json) --------------------------------
@@ -857,7 +972,6 @@ function flash(btnId: string, msg: string): void {
 
 // ---- new config from a video URL ------------------------------------------------------------
 async function newConfig(): Promise<void> {
-  if (config.nodes.length && !confirmDiscard()) return;
   const entered = prompt("Paste a YouTube video URL or ID to start from\n(or leave blank for an empty config):", "");
   if (entered === null) return; // cancelled
   const fresh = blankConfig();
@@ -869,31 +983,18 @@ async function newConfig(): Promise<void> {
     fresh.nodes = [{ id: "intro", title: "Intro", start: 0, choices: [] }];
   }
   loadConfig(fresh, "config.json");
+  // "New…" is a deliberate create action, like Studio's startBtn — persist right away rather than
+  // waiting for a first edit, so the show is browsable from the home page immediately.
+  void persistNow();
   if (id) {
     const title = await fetchVideoTitle(id);
-    if (title) {
+    // Guard against the user having moved on (a different draft, another New…) while this awaited.
+    if (title && config === fresh) {
       config.title = title;
       renderShowSettings();
+      void persistNow();
     }
   }
-}
-
-// ---- unsaved-changes guardrail --------------------------------------------------------------
-// beforeunload covers: browser back/forward, tab close, refresh, typed URL.
-window.addEventListener("beforeunload", (e) => {
-  if (!dirty) return;
-  e.preventDefault();
-  // Older Chromium needs returnValue set to show the native dialog; preventDefault covers the rest.
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
-  e.returnValue = "";
-});
-
-// For in-app actions that would discard state (New…, Open…), a confirm that names "Save As…".
-function confirmDiscard(): boolean {
-  if (!dirty) return true;
-  return confirm(
-    'You have unsaved changes.\n\nClick "Cancel" to go back and use Save As… to save your work first.\nClick "OK" to discard changes and continue.'
-  );
 }
 
 // ---- mobile drawer --------------------------------------------------------------------------
@@ -923,8 +1024,16 @@ button("configsBtn").addEventListener("click", (e) => {
   if (byId("configsMenu").hidden) void openConfigsMenu();
   else closeConfigsMenu();
 });
+button("myDraftsBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (byId("myDraftsMenu").hidden) openMyDraftsMenu();
+  else closeMyDraftsMenu();
+});
 document.addEventListener("click", (e) => {
-  if (!(e.target instanceof Element && e.target.closest(".menu-wrap"))) closeConfigsMenu();
+  if (!(e.target instanceof Element && e.target.closest(".menu-wrap"))) {
+    closeConfigsMenu();
+    closeMyDraftsMenu();
+  }
 });
 
 // mobile drawer
@@ -937,14 +1046,32 @@ button("mobileAddNodeBtn").addEventListener("click", () => {
 button("mobileSaveBtn").addEventListener("click", run(save));
 button("mobileLoadBtn").addEventListener("click", run(openFile));
 button("mobileNewBtn").addEventListener("click", run(newConfig));
+button("mobileMyDraftsBtn").addEventListener("click", () => {
+  closeMobileDrawer();
+  const list = draftStore.list();
+  if (!list.length) {
+    alert("No drafts yet — start editing to create one.");
+    return;
+  }
+  const opts = list.map((s, i) => `${String(i + 1)}: ${s.title || "(untitled)"}`).join("\n");
+  const ans = prompt("Choose a draft (enter number):\n" + opts);
+  if (ans === null) return;
+  const i = parseInt(ans, 10) - 1;
+  const entry = list[i];
+  if (Number.isNaN(i) || !entry) {
+    alert("Invalid choice.");
+    return;
+  }
+  openDraft(entry.showId);
+});
 button("mobilePlayerBtn").addEventListener("click", openInPlayer);
 input("fileInput").addEventListener("change", () => {
   const fileEl = input("fileInput");
   const file = fileEl.files?.[0];
   if (!file) return;
-  void readFileText(file).then((text) => {
+  void readFileText(file).then(async (text) => {
     try {
-      loadConfig(JSON.parse(text), file.name);
+      await adoptConfig(JSON.parse(text), file.name);
     } catch (err) {
       alert("Could not parse JSON: " + errorMessage(err));
     }
@@ -961,24 +1088,44 @@ button("studioBtn").addEventListener("click", () => {
   window.open("studio.html#transfer", "_blank");
 });
 
+// The store opens asynchronously (IndexedDB), so every action that touches it — including the
+// very first config load, which renders through the same path as an edit — is disabled
+// synchronously here, before the first `await`, so a click can't land while `draftStore`/`session`
+// are still unset.
+const bootGatedButtons = [
+  "addNodeBtn",
+  "mobileAddNodeBtn",
+  "newBtn",
+  "mobileNewBtn",
+  "loadBtn",
+  "mobileLoadBtn",
+  "myDraftsBtn",
+  "mobileMyDraftsBtn",
+].map(button);
+for (const b of bootGatedButtons) b.disabled = true;
+
 // If opened via Studio "Open in Editor", consume the transfer key from localStorage; otherwise
 // preload the config.json next to this page.
-function boot(): void {
+async function boot(): Promise<void> {
+  draftStore = await openDraftStore();
+  session = new DraftSession(draftStore);
+  await notifyCollisions(draftStore);
+  for (const b of bootGatedButtons) b.disabled = false;
+
   if (location.hash === "#transfer") {
     history.replaceState(null, "", location.pathname + location.search);
     const raw = getTransfer();
     if (raw !== null) {
-      loadConfig(raw, "transfer.json");
+      await adoptConfig(raw, "transfer.json");
       return;
     }
   }
-  fetch("config.json")
-    .then((r) => (r.ok ? (r.json() as Promise<unknown>) : Promise.reject(new Error(String(r.status)))))
-    .then((obj) => {
-      loadConfig(obj, "config.json");
-    })
-    .catch(() => {
-      loadConfig(blankConfig(), "config.json");
-    });
+  try {
+    const r = await fetch("config.json");
+    const obj: unknown = r.ok ? await r.json() : await Promise.reject(new Error(String(r.status)));
+    loadConfig(obj, "config.json");
+  } catch {
+    loadConfig(blankConfig(), "config.json");
+  }
 }
-boot();
+void boot();

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ShowConfig } from "../core/config.ts";
+import { LEGACY_BACKUP_TYPE } from "../core/config.ts";
+import type { LegacyBackup } from "../core/legacy-backup.ts";
 import { DraftStore } from "./draft-store.ts";
 import { createInMemoryStore } from "./event-store.ts";
 import { snapshotEvent } from "../core/migrate.ts";
@@ -181,6 +183,25 @@ describe("DraftStore", () => {
       const showId = s.list()[0]!.showId;
       expect(s.config(showId)?.nodes.map((n) => n.id)).not.toContain("b");
     });
+  });
+
+  it("imports a legacy bvp-backup as snapshot events, and re-importing is a no-op", async () => {
+    const s = store();
+    const backup: LegacyBackup = {
+      type: LEGACY_BACKUP_TYPE,
+      version: 1,
+      exportedAt: Date.parse("2026-01-01T00:00:00.000Z"),
+      index: [{ slug: "ukulele", title: "Ukulele", modified: Date.parse("2026-01-01T00:00:00.000Z") }],
+      configs: { ukulele: config("Ukulele") },
+    };
+    const added = await s.importLegacyBackup(backup);
+    expect(added).toBeGreaterThan(0);
+    expect(s.list().map((x) => x.title)).toEqual(["Ukulele"]);
+    expect(s.list().map((x) => x.showId)).toEqual(["slug:ukulele"]);
+
+    const again = await s.importLegacyBackup(backup);
+    expect(again).toBe(0);
+    expect(s.list()).toHaveLength(1);
   });
 
   it("reduces a migrated legacy draft the same as a created one", async () => {

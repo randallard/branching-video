@@ -31,30 +31,6 @@
   a.btn.primary, button.btn.primary { background: var(--accent-2); border-color: var(--accent); }
   a.btn.primary:hover, button.btn.primary:hover { background: var(--accent); }
 
-  .merge-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,.6);
-    display: flex; align-items: center; justify-content: center;
-    padding: 24px; z-index: 100;
-  }
-  .merge-box {
-    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-    padding: 24px; max-width: 560px; width: 100%; max-height: 80vh; overflow-y: auto;
-  }
-  .merge-box h3 { margin: 0 0 10px; font-size: 20px; }
-  .merge-summary { color: var(--muted); font-size: 14px; margin: 0 0 18px; }
-  .merge-list { display: grid; gap: 12px; margin-bottom: 20px; }
-  .merge-row {
-    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
-    padding: 12px 14px;
-  }
-  .merge-row-title { font-weight: 600; font-size: 15px; margin-bottom: 2px; }
-  .merge-row-sub { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
-  .merge-row select {
-    width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border);
-    border-radius: 6px; padding: 7px 8px; font: inherit; font-size: 13px;
-  }
-  .merge-actions { display: flex; justify-content: flex-end; gap: 10px; }
-
   h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 44px 0 16px; font-weight: 600; }
   .shows { display: grid; gap: 12px; }
   a.show {
@@ -105,7 +81,7 @@
     <div class="cta-row" style="margin: -6px 0 16px;">
       <a class="btn" id="export-all-btn" href="#">Export All ⭳</a>
       <a class="btn" id="import-all-btn" href="#">Import All ⭱</a>
-      <input type="file" id="import-all-file" accept="application/json" style="display:none" />
+      <input type="file" id="import-all-file" accept="application/json" multiple style="display:none" />
     </div>
     <div class="shows" id="local-shows">
       <div class="empty" id="local-empty" style="display:none">No local drafts yet. Build one in <a href="studio.html">Studio</a>.</div>

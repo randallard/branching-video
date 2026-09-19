@@ -1,11 +1,11 @@
 /**
  * Clean JSON output for export, transfer between pages, and validation.
  *
- * Studio and Editor historically serialized slightly differently, and slice 2 of the template
- * migration ports behaviour without changing it (ADR-0003): Studio always writes
- * `choiceDisplaySeconds` (default 8) and passes `endScreen` through as-is; Editor omits
- * `choiceDisplaySeconds` when unset and normalizes `endScreen` links to either `url` or
- * `target`. Unifying them is slice 3's work.
+ * Studio and Editor serialized slightly differently through slice 2 (ADR-0003 ported behaviour
+ * unchanged); slice 3b.3 unifies them into one `serialize()`. `choiceDisplaySeconds` is always
+ * written, defaulting to 8 (Studio's old behaviour) — cosmetic only, since the player already
+ * treats a missing value as 8. `endScreen` links are always normalized to exactly one of `url`/
+ * `target` (Editor's old, stricter behaviour).
  */
 import type { Choice, EndScreen, ShowConfig, ShowNode } from "./config.ts";
 
@@ -29,23 +29,6 @@ function nodeCommon(n: ShowNode): ShowNode {
   return o;
 }
 
-export function serializeStudio(config: ShowConfig): ShowConfig {
-  const out: ShowConfig = {
-    title: config.title || "",
-    startNode: config.startNode || "",
-    choiceDisplaySeconds: config.choiceDisplaySeconds ?? 8,
-    nodes: [],
-  };
-  if (config.masterVideoId) out.masterVideoId = config.masterVideoId;
-  out.nodes = config.nodes.map((n) => {
-    const o = nodeCommon(n);
-    if (n.endScreen) o.endScreen = n.endScreen;
-    o.choices = n.choices.map(serializeChoice);
-    return o;
-  });
-  return out;
-}
-
 function serializeEndScreen(es: EndScreen): EndScreen {
   const out: EndScreen = { links: [] };
   if (es.heading) out.heading = es.heading;
@@ -59,15 +42,13 @@ function serializeEndScreen(es: EndScreen): EndScreen {
   return out;
 }
 
-export function serializeEditor(config: ShowConfig): ShowConfig {
+export function serialize(config: ShowConfig): ShowConfig {
   const out: ShowConfig = {
     title: config.title || "",
     startNode: config.startNode || "",
+    choiceDisplaySeconds: config.choiceDisplaySeconds ?? 8,
     nodes: [],
   };
-  if (typeof config.choiceDisplaySeconds === "number") {
-    out.choiceDisplaySeconds = config.choiceDisplaySeconds;
-  }
   if (config.masterVideoId) out.masterVideoId = config.masterVideoId;
   out.nodes = config.nodes.map((n) => {
     const o = nodeCommon(n);

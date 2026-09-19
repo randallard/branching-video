@@ -83,26 +83,68 @@ against a `vite preview` on a spare port, including `player.html` actually loadi
 exercising the YouTube IFrame API against `www.youtube.com` — zero CSP violations. ADR-0026 is now
 Accepted. See [journal 2026-09-18 (2)](journal/2026-09-18-2-csp-accepted-and-shipped.md).
 
+**2026-09-18 (3) — slice 3b.3: the page wiring, done.** The home page, Studio and the Editor are
+all wired onto the event-log `DraftStore` — this is **the feature the whole migration was for**
+(see "Why this started" below, now resolved). Foundational pieces first: `DraftStore.importLegacyBackup`
+(old `bvp-backup` files → snapshot events, ADR-0011), a unified `serialize()` replacing
+`serializeStudio`/`serializeEditor` (always writes `choiceDisplaySeconds`, always normalizes
+`endScreen` links), a shared `DraftSession` (showId/nodeKeys bookkeeping + a serialized persist
+queue, since parts 1–2 already found a real same-millisecond ordering bug from unserialized
+concurrent saves), and a shared `notifyCollisions` (ADR-0024, one `confirm()` per collision).
+`core/legacy-backup.ts`'s ADR-0002 merge machinery (`classifyImport`/`Conflict`/`Resolution`/
+`importedSlug`/`buildLegacyBackup`) retired outright — a `grep` before deleting found
+**`buildLegacyBackup` had zero callers anywhere**, not just the merge-modal path, correcting an
+assumption from planning.
+
+Home page: Import All now takes a `FileList` and classifies each file independently — event
+bundle, legacy backup, or single-show config (ADR-0011's per-file update-or-add question) — with
+one combined summary; Export All now produces an event bundle instead of a `bvp-backup`. The old
+mine/theirs/both merge modal is gone entirely. Studio: `adoptConfig` (import + `#transfer` receive)
+goes through the same update-or-add path instead of autosaving over a same-titled draft by
+title-slug — **the exact bug this migration exists to fix**. Editor: chosen "draft-first, like
+Studio" — every edit autosaves into the store via the same `DraftSession`, so an Editor-built show
+appears on the home page and is playable with no explicit save, matching what Ryan asked for; a new
+"My Drafts ▾" menu opens one by showId; Save/Save As is relabeled Export/Export As — still the same
+File System Access/download mechanism, now an explicit file-publishing action rather than the
+primary save path. The Editor's known `dirty`-on-load bug (PROGRESS's earlier "found in slice 2"
+list) is resolved **by elimination, not patched**: draft-first autosave makes an "unsaved changes"
+warning meaningless, so `dirty`/`beforeunload`/`confirmDiscard` were deleted rather than fixed.
+Auditing every field handler while wiring persistence in found several (choice label, node
+start/end, `choiceDisplaySeconds`, end-screen fields, others) that never triggered *any* save path
+before — harmless under the old file-based model (Save always wrote the current in-memory state
+regardless), a real gap under draft-first autosave. Fixed all of them.
+
+`pnpm test` 113/113, `pnpm lint` and `pnpm build` clean throughout. Verified with a throwaway CDP
+smoke-test script (Node, no added dependency — matches this project's established practice) against
+a `vite preview`: all five pages load with zero console errors; a Studio-created show appears on
+the home page with no explicit save; declining Studio's update-or-add prompt on a same-titled
+import keeps **both** drafts instead of silently overwriting one; visiting the Editor creates no
+phantom draft, but a real edit does, and that edit is immediately browsable from the home page;
+Export All → Import All of the same bundle is idempotent. See
+[journal 2026-09-18 (3)](journal/2026-09-18-3-slice-3b3-page-wiring.md).
+
 **Next:**
 1. Ryan: `pnpm install`, restart the dev server as `pnpm dev` (still `0.0.0.0:8080`), click
    through the unverified list above — now including a no-choice show playing through (load the
    ukulele file in Studio → Play ▶). Also give `create.html` a read on the live site: its
    deploy step was rewritten 2026-09-15 and, while the corrected copy is confirmed live, no one
-   has yet read it as a person following the instructions.
-2. Slice 3b **part 3** — the page wiring (see worklist item 3). Parts 1 and 2 landed 2026-09-15.
-   It does not block the browser pass: the pass covers slice 2, which is already live, and a
-   clean read of current behaviour is the baseline 3b changes against.
+   has yet read it as a person following the instructions. **New in this slice, worth Ryan's own
+   browser pass too:** Studio's Import config JSON… update-or-add prompt, the Editor's My Drafts
+   menu and Export relabeling, and the home page's three-way Import All.
+2. ~~Slice 3b part 3~~ done 2026-09-18 — see above.
 3. ~~Ryan: decide ADR-0026 (CSP).~~ Done 2026-09-18 — accepted and shipped, see above.
 4. ~~Branch protection~~ done 2026-09-18. ~~Renovate installation~~ confirmed installed and
    working 2026-09-18 (PR #3 merged). Note the new PR-required workflow on `main` going forward —
    a direct `git push` to `main` will be rejected unless the admin bypass is used.
+5. Slice 4 (ADR-0023 per-field value history, ADR-0024's UI half) can now start — 3b was its
+   prerequisite.
 
 **Why this started:** Ryan wanted to load previously exported single-show configs (e.g.
-`most-useful-music-theory-for-ukulele 3.json`). Today: home-page **Import All** rejects them
-("does not look like a Branching Video backup" — it only takes `bvp-backup` bundles); Studio's
-**Import config JSON…** accepts them but autosaves by title slug, silently overwriting a
-same-titled draft. **Workaround until slice 4 (from reading the code, not tried in a browser):** Studio → Import config JSON… should work if no
-draft with the same title exists (or rename/export the existing one first).
+`most-useful-music-theory-for-ukulele 3.json`). Before slice 3b.3: home-page **Import All** rejected
+them outright, and Studio's **Import config JSON…** accepted them but autosaved by title slug,
+silently overwriting a same-titled draft. **Fixed 2026-09-18** (see slice 3b.3 above): Import All
+now accepts single-show configs directly, asking once per file if the title matches an existing
+show; Studio's import goes through the same path instead of overwriting silently.
 
 ## Architecture
 
@@ -165,8 +207,10 @@ Added in slice 3b parts 1–2 (`diff.test.ts`, `shell/draft-store.test.ts`, more
 - Re-importing the same bundle or the same config file adds nothing.
 - An ADR-0024 collision is reported with the node as it stood, and both answers settle it.
 
-Not yet: nothing outstanding in the core. The remaining provability work is whatever 3b.3's page
-wiring turns out to need.
+Not yet: nothing outstanding in the core. 3b.3's page wiring added `draft-session.test.ts` and
+`ui/collisions.test.ts` (thin coverage over already-tested store methods) and
+`core/serialize.test.ts`-equivalent coverage inside `config.test.ts` for the unified serializer;
+the page-level wiring itself is exercised by the throwaway CDP smoke test, not unit tests.
 
 ## Worklist
 
@@ -182,7 +226,7 @@ wiring turns out to need.
      snapshots), `shell/event-store.ts` (IndexedDB, idempotent by event id, in-memory fallback).
      Additive: nothing imports it, built page hashes unchanged, app behaviour identical.
      Tests 30 → 71. See [journal 2026-09-15-3](journal/2026-09-15-3-slice-3a-event-log-core.md).
-   - **3b — the wiring. Split in three; parts 1 and 2 are done and pushed, part 3 is next.**
+   - **3b — the wiring. Split in three; all three parts done.**
      `editor.ts` is 984 lines, Studio 654, the home page 294, so rewiring all of it in one commit
      would not have been reviewable.
      - **3b.1 — collision detection + diff emitter. Done.** `reduce` returns the ADR-0024
@@ -192,13 +236,16 @@ wiring turns out to need.
      - **3b.2 — the draft store. Done.** `shell/draft-store.ts`: list/open/save/create/remove,
        export/import, collisions, and the first-load migration. The seam the pages move onto.
        Found and fixed two ordering bugs — see the journal.
-     - **3b.3 — the page wiring. NEXT, and where behaviour actually changes.** Home page
-       (event-bundle Export/Import All + ADR-0011 update-or-add for single-show config files —
-       the feature this migration was for); Studio (resume list, autosave, "Import config JSON…"
-       through the same path); Editor (load/save through the store); the ADR-0024 notice with its
-       two answers; unify the Studio and Editor serializers. `setResume` moves from slug to
-       `showId` (ADR-0009), and `classifyImport`'s conflict path retires with the `bvp-backup`
-       bundle it served.
+     - **3b.3 — the page wiring. Done 2026-09-18.** Home page (event-bundle Export/Import All +
+       ADR-0011 update-or-add for single-show config files — the feature this migration was for);
+       Studio (resume list, autosave, "Import config JSON…" through the same path); Editor
+       (draft-first autosave through the store, a new My Drafts menu, Export/Export As replacing
+       Save/Save As); the ADR-0024 notice with its two answers; the Studio and Editor serializers
+       unified into one `serialize()`. `setResume` moved from slug to `showId` (ADR-0009);
+       `classifyImport`/`Conflict`/`Resolution`/`importedSlug`/`buildLegacyBackup` retired
+       entirely — all five, not just the merge-modal path (a planning assumption corrected during
+       implementation: `buildLegacyBackup` turned out to have zero remaining callers anywhere). See
+       [journal 2026-09-18 (3)](journal/2026-09-18-3-slice-3b3-page-wiring.md).
    - **Both decisions 3a had to make are now ADRs (2026-09-15), so 3b starts with them settled.**
      - [ADR-0025](adr/0025-snapshot-node-keys-derived-from-node-id.md) — snapshot node keys come
        from the node's `id`, falling back to a content hash (not position) for duplicate or blank
@@ -235,8 +282,10 @@ Found in slice 2, not yet scheduled:
 - **No validator warning for a show that stops short of its video.** Raised 2026-09-15 and not
   chosen; it would need the source video's duration, which the validator has no way to get
   without a network call. The README and `create.html` carry the rule instead.
-- **Editor marks a freshly loaded file as unsaved** (`loadConfig` → `structural()` sets `dirty`),
-  so leaving the Editor prompts even with no edits. Pre-existing; kept in the port, commented.
+- ~~Editor marks a freshly loaded file as unsaved~~ — resolved 2026-09-18 by elimination, not a
+  patch: slice 3b.3's draft-first autosave means an edit is persisted moments after it's made
+  (matching Studio, which never had this guard), so `dirty`/`beforeunload`/`confirmDiscard` were
+  deleted rather than fixed.
 - No favicon (404 on every page).
 
 Carried over, not yet scheduled (from `notes.txt`):
@@ -362,3 +411,15 @@ and [`reviews/`](reviews/README.md) for stance reviews._
   headless-Chromium pass — including an actual `player.html` load exercising the real YouTube
   IFrame API — showed zero CSP violations. ADR-0026 flipped to Accepted. See
   [journal 2026-09-18 (2)](journal/2026-09-18-2-csp-accepted-and-shipped.md).
+- **2026-09-18 (3)** — Slice 3b.3, the page wiring, done — the feature the whole migration was
+  for. Home page, Studio and the Editor all moved onto the event-log `DraftStore`; Studio's
+  silent-overwrite-on-import bug and Import All's rejection of single-show configs are both fixed
+  by construction, not patched. Editor became draft-first (Ryan's choice), gaining a My Drafts menu
+  and an Export/Export As relabeling of Save/Save As; its `dirty`-on-load bug retired by
+  elimination along with `beforeunload`/`confirmDiscard`. `classifyImport`/`Conflict`/`Resolution`/
+  `importedSlug`/`buildLegacyBackup` deleted outright — a grep before deleting found
+  `buildLegacyBackup` had no callers left at all, correcting a planning assumption. `pnpm test`
+  113/113, verified end to end with a throwaway CDP smoke script (Studio→Home autosave, the
+  update-or-add prompt actually keeping both drafts, Editor draft-first with no phantom draft on a
+  bare page load, idempotent bundle round-trip). See
+  [journal 2026-09-18 (3)](journal/2026-09-18-3-slice-3b3-page-wiring.md).
