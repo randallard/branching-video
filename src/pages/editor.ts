@@ -1247,6 +1247,11 @@ async function boot(): Promise<void> {
   window.addEventListener("pagehide", () => {
     void session.flush();
   });
+  // Leaving a field ends its burst. It also runs before a link click navigates (the mousedown
+  // blurs the field), which gives the write a head start over the best-effort pagehide flush.
+  document.addEventListener("focusout", () => {
+    void session.flush();
+  });
   await notifyCollisions(draftStore);
   for (const b of bootGatedButtons) b.disabled = false;
 

@@ -214,6 +214,20 @@ export async function openDraftInEditor(page: Page, title: string): Promise<void
   await expect(field(page, "#showSettings", "Title").locator("input")).toHaveValue(title);
 }
 
+/**
+ * Reopen a draft from the Editor's My Drafts menu — in the page, no navigation — until `check`
+ * passes. The store only shows a save once IndexedDB has it, so this is how a test waits for a
+ * write to land. Navigating (a reload, `openDraftInEditor`) straight after an edit instead can
+ * abandon a write still in flight, which is a test racing the disk, not a bug in the app.
+ */
+export async function reopenUntil(page: Page, title: string, check: () => Promise<void>): Promise<void> {
+  await expect(async () => {
+    await page.locator("#myDraftsBtn").click();
+    await page.locator("#myDraftsMenu .dd-item", { hasText: title }).first().click({ timeout: 500 });
+    await check();
+  }).toPass({ timeout: 10_000 });
+}
+
 /** A labelled form field inside `scope`. The label may carry a history badge after its text. */
 export function field(page: Page, scope: string, label: string): Locator {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

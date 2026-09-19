@@ -11,6 +11,7 @@ import {
   gotoEditor,
   historyValues,
   openDraftInEditor,
+  reopenUntil,
   test,
 } from "./support/app.ts";
 
@@ -119,9 +120,29 @@ test("an edit still waiting on its pause is saved when the draft is switched", a
   // Switch immediately — well inside the 1 s edit-burst window.
   await page.locator("#myDraftsBtn").click();
   await page.locator("#myDraftsMenu .dd-item").filter({ hasNotText: "E2E Branching" }).first().click();
+  await expect(showField(page, "Title").locator("input")).toHaveValue(UKULELE_TITLE);
 
+  // Had the save followed the switch, it would have landed on the ukulele show instead.
+  await reopenUntil(page, "E2E Branching", async () => {
+    await expect(nodeField(page, "Title").locator("input")).toHaveValue("Typed then switched", { timeout: 250 });
+  });
   await openDraftInEditor(page, "E2E Branching");
   await expect(nodeField(page, "Title").locator("input")).toHaveValue("Typed then switched");
+});
+
+test("leaving a field saves its edit at once, without waiting out the edit burst", async ({ app: { page } }) => {
+  // Frozen timers: the 1 s debounce can't fire, so only the focusout flush can save.
+  await page.clock.install();
+  await load(page, "branching.json", "E2E Branching");
+  await page.clock.pauseAt(Date.now() + 60_000);
+  const title = nodeField(page, "Title");
+
+  await title.locator("input").fill("Still typing");
+  await page.waitForTimeout(300);
+  await expect(badge(title)).toBeHidden(); // mid-burst: nothing written yet
+
+  await nodeField(page, "Video ID").locator("input").focus(); // leave the field
+  await expect(badge(title)).toHaveText("⟲ 1");
 });
 
 test("adding and deleting nodes persists, and validation reacts to a broken reference", async ({
@@ -140,6 +161,9 @@ test("adding and deleting nodes persists, and validation reacts to a broken refe
   await expect(page.locator("#validation .status-err")).toBeVisible();
   await expect(page.locator("#validation .v-item.err").first()).toContainText("left");
 
+  await reopenUntil(page, "E2E Branching", async () => {
+    await expect(page.locator("#nodeList .node-item")).toHaveCount(6, { timeout: 250 });
+  });
   await openDraftInEditor(page, "E2E Branching");
   await expect(page.locator("#nodeList .node-item")).toHaveCount(6);
   await expect(page.locator("#nodeList .node-item .id")).not.toContainText(["left"]);
@@ -235,6 +259,10 @@ test("New… from a video URL starts a draft titled from the video", async ({ ap
   await expect(showField(page, "Title").locator("input")).toHaveValue(VIDEO_TITLE);
   await expect(showField(page, "Master video ID").locator("input")).toHaveValue("Jvu5VZVe3MI");
   await expect(page.locator("#nodeList .node-item .id")).toHaveText(["intro"]);
+  // The title arrives after the draft is created, as a second save.
+  await reopenUntil(page, VIDEO_TITLE, async () => {
+    await expect(showField(page, "Title").locator("input")).toHaveValue(VIDEO_TITLE, { timeout: 250 });
+  });
   await openDraftInEditor(page, VIDEO_TITLE);
 });
 
