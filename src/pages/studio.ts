@@ -13,6 +13,10 @@ import { fetchVideoTitle } from "../shell/shows.ts";
 import { YT_STATE, loadYouTubeApi } from "../shell/youtube.ts";
 import type { YTPlayer } from "../shell/youtube.ts";
 import { button, byId, input, valueOf, checkedOf } from "../ui/dom.ts";
+import { FieldHistoryUi } from "../ui/history.ts";
+import type { MountedHistory } from "../ui/history.ts";
+import type { FieldRef } from "../core/history.ts";
+import type { HistoryField } from "../core/reduce.ts";
 
 // ── State ────────────────────────────────────────────────────────────────────
 let config: ShowConfig | null = null; // the working config object
@@ -22,6 +26,7 @@ let ytReady = false;
 let tcInterval: ReturnType<typeof setInterval> | null = null;
 let draftStore: DraftStore;
 let session: DraftSession;
+let histories: FieldHistoryUi;
 
 // ── Setup screen ─────────────────────────────────────────────────────────────
 const $setup = byId("setup");
@@ -363,24 +368,13 @@ function renderSidebar(): void {
     mkField(
       "Node ID",
       mkInput("text", node.id, (v) => {
-        if (!v || v === node.id) return;
-        if (cfg.nodes.some((x) => x.id === v)) {
-          alert("ID already in use.");
-          return;
-        }
-        // rename all references
-        for (const x of cfg.nodes) {
-          for (const c of x.choices) if (c.target === node.id) c.target = v;
-          if (x.returnTo === node.id) x.returnTo = v;
-        }
-        if (cfg.startNode === node.id) cfg.startNode = v;
-        node.id = v;
-        selectedId = v;
+        if (!renameNode(cfg, node, v)) return;
         void autoSave();
         renderTable();
         renderSidebar();
       }),
-      "Rename updates all references."
+      "Rename updates all references.",
+      nodeHist(node, "id")
     )
   );
 
@@ -392,7 +386,9 @@ function renderSidebar(): void {
         node.title = v;
         void autoSave();
         renderTable();
-      })
+      }),
+      undefined,
+      nodeHist(node, "title")
     )
   );
 
@@ -406,7 +402,9 @@ function renderSidebar(): void {
         node.start = v === "" ? undefined : parseFloat(v);
         void autoSave();
         renderTable();
-      })
+      }),
+      undefined,
+      nodeHist(node, "start")
     )
   );
   row.appendChild(
@@ -416,7 +414,9 @@ function renderSidebar(): void {
         node.end = v === "" ? undefined : parseFloat(v);
         void autoSave();
         renderTable();
-      })
+      }),
+      undefined,
+      nodeHist(node, "end")
     )
   );
   $body.appendChild(row);
@@ -433,15 +433,18 @@ function renderSidebar(): void {
           void autoSave();
         }
       ),
-      "Auto-route here when segment ends."
+      "Auto-route here when segment ends.",
+      nodeHist(node, "returnTo")
     )
   );
 
   // Choices heading
+  const choicesHist = nodeHist(node, "choices");
   const ch = document.createElement("div");
   ch.style.cssText = "font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-top:4px;";
-  ch.textContent = "Choices";
+  ch.append("Choices", choicesHist.badge);
   $body.appendChild(ch);
+  $body.appendChild(choicesHist.panel);
 
   node.choices.forEach((c, idx) => $body.appendChild(mkChoiceItem(cfg, node, c, idx)));
 
@@ -545,11 +548,12 @@ function mkChoiceItem(cfg: ShowConfig, node: ShowNode, c: Choice, idx: number): 
   return wrap;
 }
 
-function mkField(labelText: string, control: HTMLElement, hint?: string): HTMLElement {
+function mkField(labelText: string, control: HTMLElement, hint?: string, history?: MountedHistory): HTMLElement {
   const f = document.createElement("div");
   f.className = "field";
   const l = document.createElement("label");
   l.textContent = labelText;
+  if (history) l.appendChild(history.badge);
   f.appendChild(l);
   f.appendChild(control);
   if (hint) {
@@ -558,7 +562,74 @@ function mkField(labelText: string, control: HTMLElement, hint?: string): HTMLEl
     h.textContent = hint;
     f.appendChild(h);
   }
+  if (history) f.appendChild(history.panel);
   return f;
+}
+
+/** Rename a node and every reference to it. False when the new id is blank, unchanged or taken. */
+function renameNode(cfg: ShowConfig, node: ShowNode, v: string): boolean {
+  if (!v || v === node.id) return false;
+  if (cfg.nodes.some((x) => x.id === v)) {
+    alert("ID already in use.");
+    return false;
+  }
+  for (const x of cfg.nodes) {
+    for (const c of x.choices) if (c.target === node.id) c.target = v;
+    if (x.returnTo === node.id) x.returnTo = v;
+  }
+  if (cfg.startNode === node.id) cfg.startNode = v;
+  node.id = v;
+  selectedId = v;
+  return true;
+}
+
+// ── Per-field history (ADR-0023) ──────────────────────────────────────────────
+function nodeHist(node: ShowNode, field: HistoryField): MountedHistory {
+  const ref = (): FieldRef | null => {
+    const nodeKey = config ? session.nodeKeys[config.nodes.indexOf(node)] : undefined;
+    return session.showId === null || !nodeKey ? null : { showId: session.showId, nodeKey, field };
+  };
+  return histories.mount({
+    ref,
+    restore: (value) => {
+      restoreNodeField(node, field, value);
+    },
+  });
+}
+
+/** A recovered value is applied like any other edit, so it goes through the same autosave. */
+function restoreNodeField(node: ShowNode, field: HistoryField, value: unknown): void {
+  if (!config) return;
+  switch (field) {
+    case "id":
+      if (typeof value !== "string" || !renameNode(config, node, value)) return;
+      break;
+    case "title":
+    case "returnTo":
+      if (typeof value === "string") node[field] = value;
+      break;
+    case "start":
+    case "end":
+      if (typeof value === "number") node[field] = value;
+      break;
+    case "choices":
+      node.choices = JSON.parse(JSON.stringify(value)) as Choice[];
+      break;
+    // Studio doesn't edit these, so it never mounts a history for them.
+    case "videoId":
+    case "showChoicesAt":
+    case "isAside":
+    case "defaultAside":
+    case "returnAtCurrentTime":
+    case "endScreen":
+    case "startNode":
+    case "masterVideoId":
+    case "choiceDisplaySeconds":
+      return;
+  }
+  void autoSave();
+  renderTable();
+  renderSidebar();
 }
 
 function mkInput(type: string, value: string | number, onchange: (v: string) => void): HTMLInputElement {
@@ -636,6 +707,10 @@ for (const b of setupButtons) b.disabled = true;
 async function boot(): Promise<void> {
   draftStore = await openDraftStore();
   session = new DraftSession(draftStore);
+  histories = new FieldHistoryUi(draftStore);
+  session.onSaved = () => {
+    histories.refresh();
+  };
   await notifyCollisions(draftStore);
 
   for (const b of setupButtons) b.disabled = false;

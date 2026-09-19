@@ -55,6 +55,48 @@ describe("DraftSession", () => {
     expect(session.showId).not.toBe(otherId);
     expect(s.list()).toHaveLength(2);
   });
+
+  it("coalesces a burst of persistSoon calls into one write per field", async () => {
+    const s = store();
+    const session = new DraftSession(s);
+    await session.persist(config("U"));
+    const before = (await s.allEvents()).length;
+
+    const live = config("U");
+    for (const title of ["Uk", "Uku", "Ukulele"]) {
+      live.title = title;
+      session.persistSoon(live);
+    }
+    await session.flush();
+
+    expect((await s.allEvents()).length - before).toBe(1);
+    expect(s.config(session.showId!)?.title).toBe("Ukulele");
+  });
+
+  it("writes a pending edit to the show it was made on, even if another is opened first", async () => {
+    const s = store();
+    const firstId = await s.create(config("First"));
+    const secondId = await s.create(config("Second"));
+    const session = new DraftSession(s);
+    session.attach(firstId, s.open(firstId)!.nodeKeys);
+
+    session.persistSoon({ ...config("First"), title: "First, edited" });
+    session.attach(secondId, s.open(secondId)!.nodeKeys);
+    await session.flush();
+
+    expect(s.config(firstId)?.title).toBe("First, edited");
+    expect(s.config(secondId)?.title).toBe("Second");
+  });
+
+  it("tells the page after each save lands", async () => {
+    const s = store();
+    const session = new DraftSession(s);
+    let saves = 0;
+    session.onSaved = () => saves++;
+    await session.persist(config("A"));
+    await session.persist(config("B"));
+    expect(saves).toBe(2);
+  });
 });
 
 describe("adoptExternalConfig", () => {
@@ -73,7 +115,10 @@ describe("adoptExternalConfig", () => {
     try {
       const outcome = await adoptExternalConfig(s, config("Ukulele", ["intro", "chords"]));
       expect(outcome.ok).toBe(true);
-      if (outcome.ok) expect(outcome.showId).toBe(id);
+      if (outcome.ok) {
+        expect(outcome.showId).toBe(id);
+        expect(outcome.updated).toBe(true);
+      }
       expect(s.list()).toHaveLength(1);
       expect(s.config(id)?.nodes).toHaveLength(2);
     } finally {
@@ -89,7 +134,10 @@ describe("adoptExternalConfig", () => {
     try {
       const outcome = await adoptExternalConfig(s, config("Ukulele", ["other"]));
       expect(outcome.ok).toBe(true);
-      if (outcome.ok) expect(outcome.showId).not.toBe(id);
+      if (outcome.ok) {
+        expect(outcome.showId).not.toBe(id);
+        expect(outcome.updated).toBe(false);
+      }
       expect(s.list()).toHaveLength(2);
     } finally {
       globalThis.confirm = originalConfirm;

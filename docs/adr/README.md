@@ -105,3 +105,4 @@ Copy [`TEMPLATE.md`](TEMPLATE.md).
 | [0024](0024-node-removal-collisions-ask-rather-than-resolve.md) | A node deleted on one device and edited on another asks, rather than resolving silently | Accepted |
 | [0025](0025-snapshot-node-keys-derived-from-node-id.md) | Snapshot node keys are derived from the node's id, with a content-hash fallback | Accepted |
 | [0026](0026-content-security-policy-on-the-player-pages.md) | Constrain what a page may load with a Content-Security-Policy meta tag | Accepted |
+| [0027](0027-playwright-browser-tests-against-the-built-site.md) | Browser behaviour is tested by a committed Playwright suite against the built site | Accepted |
