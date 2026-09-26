@@ -145,6 +145,32 @@ test("leaving a field saves its edit at once, without waiting out the edit burst
   await expect(badge(title)).toHaveText("⟲ 1");
 });
 
+test("an edit made as the tab closes is recovered by the next page (unload backstop)", async ({
+  app,
+}) => {
+  const { page, context } = app;
+  await load(page, "branching.json", "E2E Branching");
+  // This tab's IndexedDB writes never land — the disk losing the race with the closing tab — so
+  // only the localStorage backstop can carry the edit over.
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- re-applied to each instance below
+    const transaction = IDBDatabase.prototype.transaction;
+    IDBDatabase.prototype.transaction = function (this: IDBDatabase, ...args: Parameters<typeof transaction>) {
+      if (args[1] === "readwrite") throw new Error("simulated: tab closed mid-write");
+      return transaction.apply(this, args);
+    };
+  });
+  app.allow.push(/simulated: tab closed mid-write/);
+
+  await nodeField(page, "Title").locator("input").fill("Typed as the tab closed");
+  await page.close({ runBeforeUnload: true });
+
+  const next = await context.newPage();
+  await openDraftInEditor(next, "E2E Branching");
+  await expect(nodeField(next, "Title").locator("input")).toHaveValue("Typed as the tab closed");
+  await expect(badge(nodeField(next, "Title"))).toHaveText("⟲ 1");
+});
+
 test("adding and deleting nodes persists, and validation reacts to a broken reference", async ({
   app: { page, dialogs },
 }) => {

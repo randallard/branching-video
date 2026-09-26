@@ -26,6 +26,8 @@ import {
 } from "../core/migrate.ts";
 import type { LegacyBackup } from "../core/legacy-backup.ts";
 import { loadDraftConfig, loadDraftIndex } from "./drafts.ts";
+import type { BackstopEntry } from "./backstop.ts";
+import { takeBackstop, writeBackstop } from "./backstop.ts";
 import type { EventStore } from "./event-store.ts";
 import { openEventStore } from "./event-store.ts";
 
@@ -42,7 +44,7 @@ export interface ShowSummary {
   updatedAt: string;
 }
 
-function newId(): string {
+export function newId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
@@ -103,10 +105,16 @@ export class DraftStore {
    * the order they were made. Across devices the real clocks still decide, as ADR-0008 accepts.
    */
   private now(): string {
-    const wall = new Date().toISOString();
-    const at = wall > this.lastAt ? wall : new Date(Date.parse(this.lastAt) + 1).toISOString();
+    const at = this.peekNow();
     this.lastAt = at;
     return at;
+  }
+
+  /** The timestamp `now()` would issue next, without issuing it: when an edit was made, for a
+   * save that may only land later (the unload backstop in `draft-session.ts`). */
+  peekNow(): string {
+    const wall = new Date().toISOString();
+    return wall > this.lastAt ? wall : new Date(Date.parse(this.lastAt) + 1).toISOString();
   }
 
   private async append(events: readonly ShowEvent[]): Promise<ShowEvent[]> {
@@ -145,12 +153,15 @@ export class DraftStore {
   }
 
   /** Save an edited show. Returns the events appended — empty when nothing changed, which is what
-   * makes this safe to call on every autosave. */
-  async save(working: WorkingShow): Promise<ShowEvent[]> {
+   * makes this safe to call on every autosave. `at`, when given, is when the edit was made rather
+   * than now — for a backstop replay, which must not outrank edits made after it. */
+  async save(working: WorkingShow, at?: string): Promise<ShowEvent[]> {
     const before = this.find(working.showId) ?? emptyShowState(working.showId);
+    const stamp = at ?? this.now();
+    if (stamp > this.lastAt) this.lastAt = stamp;
     return this.append(
       diffShow(before, working, {
-        at: this.now(),
+        at: stamp,
         newEventId: newId,
         newNodeKey: newId,
       })
@@ -261,6 +272,16 @@ export class DraftStore {
     this.adopt(after);
     return after.length - before;
   }
+
+  /** Save edits parked by the unload backstop, each at the time it was made. Returns the events
+   * appended — none for an edit whose own write landed after all. */
+  async replay(entries: readonly BackstopEntry[]): Promise<number> {
+    let appended = 0;
+    for (const e of entries) {
+      appended += (await this.save({ showId: e.showId, config: e.config, nodeKeys: e.nodeKeys }, e.at)).length;
+    }
+    return appended;
+  }
 }
 
 /**
@@ -288,5 +309,25 @@ export async function openDraftStore(): Promise<DraftStore> {
     }
   }
 
-  return new DraftStore(store, unionEvents(await store.all()), persistent);
+  const drafts = new DraftStore(store, unionEvents(await store.all()), persistent);
+  await replayBackstop(drafts);
+  return drafts;
+}
+
+/** Fold in edits a closing page parked in `localStorage` (`backstop.ts`). If the replay itself
+ * fails they are parked again, under a new key, for the next page to try. */
+async function replayBackstop(drafts: DraftStore): Promise<void> {
+  let storage: Storage;
+  try {
+    storage = localStorage;
+  } catch {
+    return;
+  }
+  const entries = takeBackstop(storage);
+  if (entries.length === 0) return;
+  try {
+    await drafts.replay(entries);
+  } catch {
+    writeBackstop(storage, `retry-${newId()}`, entries);
+  }
 }

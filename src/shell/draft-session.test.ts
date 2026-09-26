@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ShowConfig } from "../core/config.ts";
+import { takeBackstop } from "./backstop.ts";
 import { DraftSession, adoptExternalConfig } from "./draft-session.ts";
 import { DraftStore } from "./draft-store.ts";
 import { createInMemoryStore } from "./event-store.ts";
+import { memoryStorage } from "./memory-storage.test-util.ts";
 
 const config = (title: string, nodeIds: string[] = ["intro"]): ShowConfig => ({
   title,
@@ -96,6 +98,115 @@ describe("DraftSession", () => {
     await session.persist(config("A"));
     await session.persist(config("B"));
     expect(saves).toBe(2);
+  });
+});
+
+describe("the unload backstop", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** A page's session over a shared log, and a "next page" that opens the same log afresh. */
+  async function setup() {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-19T10:00:00.000Z"));
+    const log = createInMemoryStore();
+    const storage = memoryStorage();
+    const first = new DraftStore(log, [], true);
+    const session = new DraftSession(first);
+    session.useBackstop(storage);
+    await session.persist(config("Ukulele", ["intro"]));
+    const showId = session.showId!;
+    const nextPage = async (): Promise<{ store: DraftStore; appended: number }> => {
+      const store = new DraftStore(log, await log.all(), true);
+      return { store, appended: await store.replay(takeBackstop(storage)) };
+    };
+    return { log, storage, first, session, showId, nextPage };
+  }
+
+  it("recovers an edit whose write never landed before the page went away", async () => {
+    const { session, showId, nextPage } = await setup();
+    vi.setSystemTime(new Date("2026-09-19T10:00:05.000Z"));
+    session.persistSoon({ ...config("Ukulele", ["intro"]), title: "Typed as the tab closed" });
+    session.writeBackstop(); // pagehide — and the page dies before the burst is written
+
+    const { store } = await nextPage();
+    expect(store.config(showId)?.title).toBe("Typed as the tab closed");
+  });
+
+  it("never lets a replay outrank an edit made after it", async () => {
+    const { session, storage, showId, nextPage } = await setup();
+    vi.setSystemTime(new Date("2026-09-19T10:00:05.000Z"));
+    session.persistSoon({ ...config("Ukulele", ["intro"]), title: "Parked on hide" });
+    session.writeBackstop(); // the tab was hidden, not closed…
+    const key = storage.key(0) ?? "";
+    const parked = storage.getItem(key) ?? "";
+    vi.setSystemTime(new Date("2026-09-19T10:00:09.000Z"));
+    await session.persist({ ...config("Ukulele", ["intro"]), title: "Edited after coming back" });
+    // …and the parked copy outlived it (a crash before the key was cleared), so it gets replayed.
+    storage.setItem(key, parked);
+    const { store, appended } = await nextPage();
+    expect(appended).toBeGreaterThan(0); // it really did replay…
+    expect(store.config(showId)?.title).toBe("Edited after coming back"); // …and lost to the newer edit
+  });
+
+  it("adds nothing when replaying an edit that did land", async () => {
+    const { session, storage, nextPage } = await setup();
+    session.persistSoon({ ...config("Ukulele", ["intro"]), title: "Landed" });
+    session.writeBackstop();
+    const key = storage.key(0) ?? "";
+    const parked = storage.getItem(key) ?? "";
+    await session.flush(); // the write lands and the session clears its key…
+    storage.setItem(key, parked); // …unless the page died in between: put it back.
+    const { appended } = await nextPage();
+    expect(appended).toBe(0);
+  });
+
+  it("fixes a new node's key when the edit is made, so a replay can't duplicate it", async () => {
+    const { session, showId, nextPage } = await setup();
+    const edited = config("Ukulele", ["intro", "chords"]);
+    session.nodeKeys.push(null);
+    session.persistSoon(edited);
+    expect(session.nodeKeys.every((k) => k !== null)).toBe(true);
+    session.writeBackstop();
+    await session.flush(); // the write landed too
+
+    const { store, appended } = await nextPage();
+    expect(appended).toBe(0);
+    expect(store.config(showId)?.nodes.map((n) => n.id)).toEqual(["intro", "chords"]);
+  });
+
+  it("clears its parked edits once they have all landed", async () => {
+    const { session, storage } = await setup();
+    session.persistSoon({ ...config("Ukulele", ["intro"]), title: "Briefly parked" });
+    session.writeBackstop();
+    expect(storage.length).toBe(1);
+    await session.flush();
+    expect(storage.length).toBe(0);
+  });
+});
+
+describe("a failed save", () => {
+  it("rejects its own caller but doesn't stop the saves after it", async () => {
+    const inner = createInMemoryStore();
+    let failNext = false;
+    const flaky = {
+      append: async (events: Parameters<typeof inner.append>[0]) => {
+        if (failNext) {
+          failNext = false;
+          throw new Error("disk full");
+        }
+        await inner.append(events);
+      },
+      all: () => inner.all(),
+    };
+    const s = new DraftStore(flaky, [], true);
+    const session = new DraftSession(s);
+    await session.persist(config("A"));
+    failNext = true;
+    await expect(session.persist({ ...config("A"), title: "B" })).rejects.toThrow("disk full");
+    await session.persist({ ...config("A"), title: "C" });
+    expect(s.config(session.showId!)?.title).toBe("C");
   });
 });
 

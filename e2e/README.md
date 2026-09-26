@@ -39,7 +39,7 @@ The preview runs on **4299** (`E2E_PORT` to change it), so a run never touches t
 | `player.e2e.ts` | Play-through of the real ukulele file (ADR-0022), choices + countdown + pause, mid-segment cues, asides (back-to-branch, auto-resume, skip), end screens, chapter menu, back/forward, deep links, a missing config |
 | `home.e2e.ts` | Import All of a config / legacy backup / junk / multi-file, update-or-add both ways, Export All → fresh browser, the Studio/Editor/Play links |
 | `studio.e2e.ts` | Marking against the playing video, transport + keyboard, import update-or-add, legacy-file refusal, sidebar history, resume, hand-off to Editor/Player |
-| `editor.e2e.ts` | Edit-burst coalescing and history on every field kind, id restore cascading, autosave + reload, a pending edit surviving a draft switch, add/delete + validation, Export As (download and save-picker paths), Open…, Copy JSON, New… from a URL |
+| `editor.e2e.ts` | Edit-burst coalescing and history on every field kind, id restore cascading, autosave + reload, a pending edit surviving a draft switch, `focusout` flush (fake clock), an edit surviving the tab closing mid-write (ADR-0028), add/delete + validation, Export As (download and save-picker paths), Open…, Copy JSON, New… from a URL |
 | `mobile.e2e.ts` | Pixel 7 emulation: the Editor drawer, history in the drawer, My Drafts by number, no sideways scroll on any page |
 | `two-devices.e2e.ts` | Same-field conflict (later wins, loser recoverable), different fields both survive, delete-vs-edit collision both answers (ADR-0024) |
 
@@ -57,6 +57,8 @@ or page layout.
    what you saw.
 3. **A real phone.** Open the home page, Editor and player on an actual phone: the drawer, the
    ⟲ history panels, choice buttons big enough to tap, the player filling the screen.
+   Also: type in the Editor, switch straight to another app, swipe the browser away, and reopen.
+   The edit should be there (ADR-0028's backstop; the suite can't kill a real mobile tab).
 4. **The native save dialog.** In desktop Chrome, Editor → Export As… should open the OS
    "Save As" dialog (the suite stubs it), and Export after that writes the same file.
 5. **`create.html` as a newcomer.** Read it top to bottom as someone following the steps, on
