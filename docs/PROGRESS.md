@@ -189,8 +189,11 @@ copy**. That happens on `main` too; it's item 1 below. See
    hide-time copy doesn't win, which needs a real tab switch) and step 5 (Studio).
 1. **The `#transfer` handoff can revert edits.** "Open in Studio"/"Open in Editor" import the
    whole config as a snapshot. A stale sending tab plus "OK, update" overwrites newer fields, and
-   "Cancel" makes a same-titled duplicate. Proposal to write up as an ADR: on the same device,
-   pass the show id, not the config, so there's nothing to import. Not started.
+   "Cancel" makes a same-titled duplicate. **Decided in
+   [ADR-0029](adr/0029-same-device-handoffs-carry-the-show-id-not-the-config.md) (accepted
+   2026-09-26, branch `transfer-handoff-by-show-id`):** every handoff, the home page's Studio link
+   included, opens `#show=<id>`, with the sender parking its unsaved edits through the ADR-0028
+   backstop first; `bvp:resume` goes. Being built on that branch.
 2. **Re-run #15** once this fix is on `main`. `main` requires branches to be up to date, so
    Renovate will rebase #15 itself (or tick its rebase box), and CI re-runs then.
 3. **The five manual checks** in [`e2e/README.md`](../e2e/README.md#what-stays-manual): real
