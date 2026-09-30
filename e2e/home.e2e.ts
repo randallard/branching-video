@@ -90,22 +90,28 @@ test("Export All then Import All in a fresh browser reproduces the drafts, and a
   await other.context.close();
 });
 
-test("a draft's Studio link resumes that draft in Studio", async ({ app: { page, dialogs } }) => {
+test("a draft's Studio link opens that draft in Studio by id, and a reload keeps it open (ADR-0029)", async ({
+  app: { page, dialogs },
+}) => {
   await gotoHome(page);
   await importAll(page, [fixture("ukulele.json")]);
   await dialogs.alert(/added/);
   await page.locator("#local-shows .draft .studio-link").click();
   await expect(page.locator("#workspace")).toBeVisible();
   await expect(page.locator("#nodeTableBody tr")).toHaveCount(11);
+  expect(new URL(page.url()).hash).toMatch(/^#show=/);
+
+  await page.reload();
+  await expect(page.locator("#workspace")).toBeVisible();
+  await expect(page.locator("#nodeTableBody tr")).toHaveCount(11);
 });
 
-test("a draft's Editor link opens it in the Editor, which asks before updating the same-titled draft", async ({
+test("a draft's Editor link opens that draft by id: no update-or-add question, no copy (ADR-0029)", async ({
   app: { page, dialogs, context },
 }) => {
   await gotoHome(page);
   await importAll(page, [fixture("ukulele.json")]);
   await dialogs.alert(/added/);
-  dialogs.confirm(true);
   const popup = context.waitForEvent("page");
   await page.locator("#local-shows .draft .editor-link").click();
   const editor = await popup;

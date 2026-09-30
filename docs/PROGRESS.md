@@ -193,7 +193,11 @@ copy**. That happens on `main` too; it's item 1 below. See
    [ADR-0029](adr/0029-same-device-handoffs-carry-the-show-id-not-the-config.md) (accepted
    2026-09-26, branch `transfer-handoff-by-show-id`):** every handoff, the home page's Studio link
    included, opens `#show=<id>`, with the sender parking its unsaved edits through the ADR-0028
-   backstop first; `bvp:resume` goes. Being built on that branch.
+   backstop first; `bvp:resume` goes. **Built, not yet committed** (waiting on Ryan's local
+   check): 138 unit, 69 e2e, checked in Chrome with a stale Studio tab. Also fixed a
+   take-after-read race in `openDraftStore()`. See
+   [journal 2026-09-26 (2)](journal/2026-09-26-2-handoffs-by-show-id.md). Then commit, and open
+   a PR stacked on #18 (or rebase onto `main` once #18 merges).
 2. **Re-run #15** once this fix is on `main`. `main` requires branches to be up to date, so
    Renovate will rebase #15 itself (or tick its rebase box), and CI re-runs then.
 3. **The five manual checks** in [`e2e/README.md`](../e2e/README.md#what-stays-manual): real

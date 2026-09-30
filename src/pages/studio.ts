@@ -2,11 +2,13 @@
 import { isLegacyBackup, normalizeConfig } from "../core/config.ts";
 import type { Choice, ShowConfig, ShowNode } from "../core/config.ts";
 import { serialize, toFileText } from "../core/serialize.ts";
+import { parseShowHash } from "../core/handoff.ts";
 import { escapeHtml, extractVideoId, fmtTime, slugify, uniqueId } from "../core/text.ts";
-import { getTransfer, setTransfer, takeResume } from "../shell/drafts.ts";
+import { setTransfer } from "../shell/drafts.ts";
 import { adoptExternalConfig, DraftSession, guardAgainstUnload } from "../shell/draft-session.ts";
 import type { DraftStore } from "../shell/draft-store.ts";
 import { openDraftStore } from "../shell/draft-store.ts";
+import { handOff, MISSING_DRAFT_TEXT, syncShowHash } from "../shell/handoff.ts";
 import { downloadText, errorMessage, readFileText } from "../shell/files.ts";
 import { notifyCollisions } from "../ui/collisions.ts";
 import { fetchVideoTitle } from "../shell/shows.ts";
@@ -65,7 +67,7 @@ button("startBtn").addEventListener("click", () => {
   enterWorkspace();
 });
 
-// Take an existing config object (import / transfer / "Import config JSON…") into the workspace.
+// Take a config file ("Import config JSON…") into the workspace.
 // Goes through the same update-or-add path as the home page's Import All (ADR-0011) instead of
 // autosaving straight over a same-titled draft.
 async function adoptConfig(raw: unknown): Promise<boolean> {
@@ -142,18 +144,31 @@ button("resumeBtn").addEventListener("click", () => {
     alert("Invalid choice.");
     return;
   }
-  const working = draftStore.open(entry.showId);
-  if (!working) {
-    alert("Could not load draft.");
-    return;
+  if (!openShow(entry.showId)) alert("Could not load draft.");
+});
+
+/** Open a draft from the store into the workspace. False when it isn't there, or has no master
+ * video for Studio to work from (the setup screen then says so). */
+function openShow(showId: string): boolean {
+  const working = draftStore.open(showId);
+  if (!working) return false;
+  if (!working.config.masterVideoId) {
+    syncShowHash(null);
+    showSetupError(
+      'Studio works from a single master video, and that draft has none. Open it in the Editor and set "Master video ID" first.'
+    );
+    return true;
   }
-  session.attach(entry.showId, working.nodeKeys);
+  $setupErr.style.display = "none";
+  session.attach(showId, working.nodeKeys);
   config = working.config;
   enterWorkspace();
-});
+  return true;
+}
 
 function resetToSetup(): void {
   session.reset();
+  syncShowHash(null);
   config = null;
   selectedId = null;
   stopTcInterval();
@@ -170,6 +185,7 @@ function enterWorkspace(): void {
   $workspace.classList.add("visible");
   for (const b of headerButtons) b.disabled = false;
   void autoSave();
+  syncShowHash(session.showId); // a new show has its id from that first save (ADR-0028)
   loadYouTubeApi(onYTReady);
   renderTable();
   renderSidebar();
@@ -666,8 +682,7 @@ button("saveBtn").addEventListener("click", () => {
 
 button("editBtn").addEventListener("click", () => {
   if (!config) return;
-  setTransfer(serialize(config));
-  window.open("editor.html#transfer", "_blank");
+  handOff(session, config, "editor.html");
 });
 
 button("playBtn").addEventListener("click", () => {
@@ -717,23 +732,11 @@ async function boot(): Promise<void> {
   for (const b of setupButtons) b.disabled = false;
   if (!draftStore.list().length) button("resumeBtn").disabled = true;
 
-  // If another page handed us a config (e.g. editor "Open in Studio"), consume the transfer
-  // key from localStorage — same convention as the editor.
-  if (location.hash === "#transfer") {
-    history.replaceState(null, "", location.pathname + location.search);
-    const raw = getTransfer();
-    if (raw !== null && (await adoptConfig(raw))) return;
-  }
-
-  // If the home page sent us a specific draft to resume, load it immediately.
-  const resumeId = takeResume();
-  if (resumeId) {
-    const working = draftStore.open(resumeId);
-    if (working) {
-      session.attach(resumeId, working.nodeKeys);
-      config = working.config;
-      enterWorkspace();
-    }
+  // Another page handed us a draft by id, or this is a reload of one (ADR-0029).
+  const handed = parseShowHash(location.hash);
+  if (handed !== null && !openShow(handed)) {
+    syncShowHash(null);
+    alert(MISSING_DRAFT_TEXT);
   }
 }
 

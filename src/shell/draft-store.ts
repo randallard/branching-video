@@ -309,25 +309,34 @@ export async function openDraftStore(): Promise<DraftStore> {
     }
   }
 
+  // Parked edits are taken *before* the log is read. The page that parked them may still be open
+  // (a handoff, ADR-0029) and clears its key once its own write lands. Taken after the read, a
+  // write landing in between would be in neither the read nor the key.
+  const parked = takeParked();
   const drafts = new DraftStore(store, unionEvents(await store.all()), persistent);
-  await replayBackstop(drafts);
+  await replayParked(drafts, parked);
   return drafts;
 }
 
-/** Fold in edits a closing page parked in `localStorage` (`backstop.ts`). If the replay itself
- * fails they are parked again, under a new key, for the next page to try. */
-async function replayBackstop(drafts: DraftStore): Promise<void> {
-  let storage: Storage;
+function takeParked(): { storage: Storage; entries: BackstopEntry[] } | null {
   try {
-    storage = localStorage;
+    const storage = localStorage;
+    return { storage, entries: takeBackstop(storage) };
   } catch {
-    return;
+    return null;
   }
-  const entries = takeBackstop(storage);
-  if (entries.length === 0) return;
+}
+
+/** Fold in edits a page parked in `localStorage` (`backstop.ts`). If the replay itself fails they
+ * are parked again, under a new key, for the next page to try. */
+async function replayParked(
+  drafts: DraftStore,
+  parked: { storage: Storage; entries: BackstopEntry[] } | null
+): Promise<void> {
+  if (parked === null || parked.entries.length === 0) return;
   try {
-    await drafts.replay(entries);
+    await drafts.replay(parked.entries);
   } catch {
-    writeBackstop(storage, `retry-${newId()}`, entries);
+    writeBackstop(parked.storage, `retry-${newId()}`, parked.entries);
   }
 }
