@@ -109,7 +109,7 @@ jobs:
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version: 22
+          node-version: 22.23.3
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
@@ -132,7 +132,7 @@ jobs:
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version: 22
+          node-version: 22.23.3
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: known-vulnerability audit
@@ -163,7 +163,7 @@ jobs:
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version: 22
+          node-version: 22.23.3
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # An explicit, version-pinned download from Playwright's CDN — nothing is fetched at install
