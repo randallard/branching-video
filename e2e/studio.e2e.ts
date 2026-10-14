@@ -153,11 +153,11 @@ test("resuming a draft from the setup screen picks it by number", async ({ app: 
   await expect(rows(page)).toHaveCount(11);
 });
 
-test("Open in Editor and Play hand the show to those pages", async ({ app: { page, dialogs, context } }) => {
+test("Open in Editor and Play hand the show to those pages", async ({ app: { page, context } }) => {
   await gotoStudio(page);
   await importUkulele(page);
 
-  dialogs.confirm(true); // the Editor's update-or-add on receiving the transfer
+  // By id (ADR-0029): the Editor opens the draft, with no update-or-add question.
   let popup = context.waitForEvent("page");
   await page.locator("#editBtn").click();
   const editor = await popup;
@@ -168,4 +168,53 @@ test("Open in Editor and Play hand the show to those pages", async ({ app: { pag
   const player = await popup;
   await expect(player.locator("#show-title")).toHaveText(UKULELE_TITLE);
   await expect(player.locator("#node-title")).toHaveText("intro");
+});
+
+test("Open in Editor from a stale Studio tab reverts nothing and makes no copy (ADR-0029)", async ({
+  app: { page, context },
+}) => {
+  await gotoStudio(page);
+  await importUkulele(page);
+
+  // The Editor changes a title while this Studio tab sits open, still showing "intro".
+  let popup = context.waitForEvent("page");
+  await page.locator("#editBtn").click();
+  const editor = await popup;
+  const editorTitle = field(editor, "#editor", "Title");
+  await editorTitle.locator("input").fill("Edited in the Editor");
+  await editorTitle.locator("input").blur();
+  await expect(badge(field(editor, "#editor", "Title"))).toHaveText("⟲ 1");
+  await expect(cell(page, 0, 1)).toHaveText("intro");
+
+  // Handing off from the stale tab used to import its old copy over the Editor's edit.
+  popup = context.waitForEvent("page");
+  await page.locator("#editBtn").click();
+  const again = await popup;
+  await expect(field(again, "#editor", "Title").locator("input")).toHaveValue("Edited in the Editor");
+
+  await gotoHome(page);
+  await expect(draftTitles(page)).toHaveCount(1);
+});
+
+test("a Studio edit made just before Open in Editor is there in the Editor", async ({ app: { page, context } }) => {
+  await gotoStudio(page);
+  await importUkulele(page);
+  await rows(page).first().click();
+  const title = field(page, "#sidebar-body", "Title");
+  await title.locator("input").fill("Just typed");
+  await title.locator("input").press("Enter");
+
+  const popup = context.waitForEvent("page");
+  await page.locator("#editBtn").click();
+  const editor = await popup;
+  await expect(field(editor, "#editor", "Title").locator("input")).toHaveValue("Just typed");
+});
+
+test("a #show= link to a draft this browser doesn't have says so and shows the setup screen", async ({
+  app: { page, dialogs },
+}) => {
+  await page.goto("studio.html#show=not-a-draft-here");
+  await dialogs.alert(/isn't in this browser's drafts/);
+  await expect(page.locator("#setup")).toBeVisible();
+  expect(new URL(page.url()).hash).toBe("");
 });

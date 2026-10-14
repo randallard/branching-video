@@ -37,9 +37,9 @@ The preview runs on **4299** (`E2E_PORT` to change it), so a run never touches t
 |---|---|
 | `pages.e2e.ts` | Every page loads clean under its CSP; the harness itself catches a violation |
 | `player.e2e.ts` | Play-through of the real ukulele file (ADR-0022), choices + countdown + pause, mid-segment cues, asides (back-to-branch, auto-resume, skip), end screens, chapter menu, back/forward, deep links, a missing config |
-| `home.e2e.ts` | Import All of a config / legacy backup / junk / multi-file, update-or-add both ways, Export All → fresh browser, the Studio/Editor/Play links |
-| `studio.e2e.ts` | Marking against the playing video, transport + keyboard, import update-or-add, legacy-file refusal, sidebar history, resume, hand-off to Editor/Player |
-| `editor.e2e.ts` | Edit-burst coalescing and history on every field kind, id restore cascading, autosave + reload, a pending edit surviving a draft switch, `focusout` flush (fake clock), an edit surviving the tab closing mid-write (ADR-0028), add/delete + validation, Export As (download and save-picker paths), Open…, Copy JSON, New… from a URL |
+| `home.e2e.ts` | Import All of a config / legacy backup / junk / multi-file, update-or-add both ways, export All → fresh browser, the Studio/Editor/Play links (by id, no prompt, reload keeps the draft — ADR-0029) |
+| `studio.e2e.ts` | Marking against the playing video, transport + keyboard, import update-or-add, legacy-file refusal, sidebar history, resume, hand-off to Editor/Player, a stale Studio tab handing off reverting nothing (ADR-0029), a `#show=` id this browser doesn't have |
+| `editor.e2e.ts` | Edit-burst coalescing and history on every field kind, id restore cascading, autosave + reload, a pending edit surviving a draft switch, `focusout` flush (fake clock), an edit surviving the tab closing mid-write (ADR-0028), add/delete + validation, Export As (download and save-picker paths), Open…, Copy JSON, New… from a URL, Open in Studio carrying an edit whose write never lands and from the untouched example (ADR-0029), the open draft in the URL |
 | `mobile.e2e.ts` | Pixel 7 emulation: the Editor drawer, history in the drawer, My Drafts by number, no sideways scroll on any page |
 | `two-devices.e2e.ts` | Same-field conflict (later wins, loser recoverable), different fields both survive, delete-vs-edit collision both answers (ADR-0024) |
 

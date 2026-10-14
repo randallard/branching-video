@@ -2,12 +2,13 @@
 // Export All / Import All.
 import { isEventBundle } from "../core/bundle.ts";
 import { normalizeConfig } from "../core/config.ts";
+import { showHash } from "../core/handoff.ts";
 import { parseLegacyBackup } from "../core/legacy-backup.ts";
 import type { ManifestEntry } from "../core/manifest.ts";
 import { adoptExternalConfig } from "../shell/draft-session.ts";
 import type { DraftStore } from "../shell/draft-store.ts";
 import { openDraftStore } from "../shell/draft-store.ts";
-import { setResume, setTransfer } from "../shell/drafts.ts";
+import { setTransfer } from "../shell/drafts.ts";
 import { downloadText, readFileText } from "../shell/files.ts";
 import { SHOWS_DIR, fetchShows } from "../shell/shows.ts";
 import { notifyCollisions } from "../ui/collisions.ts";
@@ -62,25 +63,15 @@ function renderLocalDrafts(): void {
     div.innerHTML =
       `<div class="meta"><div class="t"></div><div class="f">Local draft · ${date}</div></div>` +
       `<div class="actions">` +
-      `<a href="studio.html" class="primary studio-link">Studio ✦</a>` +
-      `<a href="editor.html" class="editor-link">Editor</a>` +
+      `<a class="primary studio-link">Studio ✦</a>` +
+      `<a target="_blank" class="editor-link">Editor</a>` +
       `<a href="player.html?config=transfer" class="play-link">Play ▶</a>` +
       `</div>`;
     const t = div.querySelector(".t");
     if (t) t.textContent = s.title;
-    // Studio link — resume the specific draft
-    div.querySelector(".studio-link")?.addEventListener("click", (ev) => {
-      ev.preventDefault();
-      setResume(s.showId);
-      location.href = "studio.html";
-    });
-    // Editor link — transfer the config
-    div.querySelector(".editor-link")?.addEventListener("click", (ev) => {
-      ev.preventDefault();
-      const cfg = draftStore.config(s.showId);
-      if (cfg) setTransfer(cfg);
-      window.open("editor.html#transfer", "_blank");
-    });
+    // Studio and Editor open this draft by id (ADR-0029): plain links, so middle-click works too.
+    div.querySelector(".studio-link")?.setAttribute("href", "studio.html" + showHash(s.showId));
+    div.querySelector(".editor-link")?.setAttribute("href", "editor.html" + showHash(s.showId));
     // Play link — transfer the config
     div.querySelector(".play-link")?.addEventListener("click", (ev) => {
       ev.preventDefault();
