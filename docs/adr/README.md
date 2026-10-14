@@ -92,7 +92,7 @@ Copy [`TEMPLATE.md`](TEMPLATE.md).
 | [0011](0011-legacy-drafts-and-backups-import-as-snapshot-events.md) | Existing drafts, old backups and single-show files enter the log as snapshot events | Accepted |
 | [0012](0012-block-install-time-scripts.md) | Block install-time script execution | Accepted |
 | [0013](0013-pin-exact-versions-restrict-registry.md) | Exact dependency versions, one registry, frozen lockfile | Accepted |
-| [0014](0014-age-gate-dependency-admission.md) | Age-gate new releases at the package manager and the update bot | Accepted |
+| [0014](0014-age-gate-dependency-admission.md) | Age-gate new releases at the package manager and the update bot | Superseded by 0030 |
 | [0015](0015-ci-vulnerability-scanning.md) | CI vulnerability scanning — pnpm audit, OSV-Scanner, signatures | Accepted |
 | [0016](0016-sbom-via-syft.md) | Generate the SBOM with Syft in CI | Accepted |
 | [0017](0017-license-allowlist.md) | Enforce a dependency licence allowlist in CI | Accepted |
@@ -107,3 +107,4 @@ Copy [`TEMPLATE.md`](TEMPLATE.md).
 | [0026](0026-content-security-policy-on-the-player-pages.md) | Constrain what a page may load with a Content-Security-Policy meta tag | Accepted |
 | [0027](0027-playwright-browser-tests-against-the-built-site.md) | Browser behaviour is tested by a committed Playwright suite against the built site | Accepted |
 | [0028](0028-unload-backstop-in-localstorage-replayed-at-edit-time.md) | Edits not yet in IndexedDB are parked in localStorage on unload and replayed at edit time | Accepted |
+| [0030](0030-one-day-age-gate.md) | The age gate is one day, not fourteen | Accepted |

@@ -4,7 +4,7 @@ _Last updated: 2026-10-14_
 
 ## Status / next
 
-**2026-10-14 — advisory fix in PR (`ea6de0e`).** Open Renovate PRs were red from advisories on `main` itself; overrides added, http-cache-semantics ignored until 2026-10-18 (override replaces it then). Merge this first. See [journal 2026-10-14](journal/2026-10-14-transitive-advisories-and-one-quarantined.md).
+**2026-10-14 — advisory fix in PR #20 (`8e7d774`).** Open Renovate PRs were red from advisories on `main` itself; overrides added. Also [ADR-0030](adr/0030-one-day-age-gate.md): age gate 14 days → 1 day, so no ignore is needed. Merge #20 first, then #21 (ADR-0029), then Renovate. See [journal](journal/2026-10-14-2-age-gate-moves-to-one-day.md).
 
 **Status:** Mid-migration onto `cr-ci-cd-rust-typescript-template`
 ([ADR-0003](adr/0003-retrofit-cr-ci-cd-template-onto-existing-repo.md)). **Slices 1 and 2 are on
