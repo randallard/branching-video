@@ -1,0 +1,6 @@
+# ADR-0014 quarantine, mirrored from pnpm-workspace.yaml's auditConfig. Self-expiring: the only
+# patched http-cache-semantics (4.3.0, published 2026-10-04) clears minimumReleaseAge on 2026-10-18.
+[[IgnoredVulns]]
+id = "GHSA-ch52-4w7c-c8xp"
+ignoreUntil = 2026-10-18
+reason = "Only patched version (4.3.0) is inside the 14-day release quarantine (ADR-0014); dev-tooling transitive via license-checker."
