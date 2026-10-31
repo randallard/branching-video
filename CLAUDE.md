@@ -35,3 +35,8 @@ branching-video predates the template and is being migrated onto it in place —
 - People have real drafts in their browsers' `localStorage` under `bvp:*` keys. Never delete or
   rewrite those keys.
 - Ryan runs the dev server; say when it needs a restart rather than starting one.
+- **Every `as` (other than `as const`) needs a `// cast (any-registry): …` reason and a row in
+  `docs/any-registry.md`**; `pnpm casts` checks both, in CI (ADR-0032). A cast you can't justify
+  becomes a check instead.
+- **axe runs against every page** (`e2e/a11y.e2e.ts`, ADR-0033). A new page or form gets a check
+  there; a new field goes through `field()` / `mkField()` so its label names it.

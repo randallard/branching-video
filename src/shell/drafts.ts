@@ -18,6 +18,8 @@ const TRANSFER_KEY = "bvp:transfer";
 function parse(raw: string | null): unknown {
   if (raw === null) return null;
   try {
+    // cast (any-registry): JSON.parse returns any; widening it to unknown claims nothing, and every
+    // caller narrows it.
     return JSON.parse(raw) as unknown;
   } catch {
     return null;

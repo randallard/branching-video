@@ -18,9 +18,11 @@
     "test:watch": "vitest",
     "e2e": "pnpm build && playwright test",
     "lint": "eslint . --max-warnings 0",
-    "validate": "node tools/validate-config.ts"
+    "validate": "node tools/validate-config.ts",
+    "casts": "node tools/any-registry-check.ts"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.64.1",
     "@types/node": "24.19.2",

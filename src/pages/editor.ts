@@ -32,6 +32,8 @@ interface FsaWindow {
 interface UaDataNavigator {
   userAgentData?: { brands?: { brand: string }[] };
 }
+// cast (any-registry): the File System Access API isn't in TypeScript's DOM lib; FsaWindow declares
+// both methods optional, and every use checks for them first.
 const fsa = window as unknown as FsaWindow;
 const JSON_PICKER_TYPES = [{ description: "JSON config", accept: { "application/json": [".json"] } }];
 
@@ -90,9 +92,22 @@ function renameNode(oldId: string, newId: string): boolean {
 
 const serialize = (): ShowConfig => serializeConfig(config);
 
+let fieldLabelSeq = 0;
+
+/** The form control a field labels: the control itself, or the single one inside a wrapper. */
+function labelTarget(control: HTMLElement): HTMLElement | null {
+  if (control.matches("input, select, textarea")) return control;
+  const inner = control.querySelectorAll<HTMLElement>("input, select, textarea");
+  return inner.length === 1 ? (inner[0] ?? null) : null;
+}
+
 function field(labelText: string, control: HTMLElement, hint?: string, history?: MountedHistory): HTMLElement {
+  // The visible label names its control (ADR-0033). Through aria-labelledby on the label's text
+  // alone, so the history badge beside it ("⟲ 2") isn't read as part of the field's name.
+  const textId = `field-label-${String(++fieldLabelSeq)}`;
+  labelTarget(control)?.setAttribute("aria-labelledby", textId);
   return el("div", { class: "field" }, [
-    el("label", {}, [labelText, history?.badge]),
+    el("label", {}, [el("span", { id: textId, text: labelText }), history?.badge]),
     control,
     hint ? el("div", { class: "hint", text: hint }) : null,
     history?.panel,
@@ -101,6 +116,8 @@ function field(labelText: string, control: HTMLElement, hint?: string, history?:
 
 // ---- per-field history (ADR-0023) ----------------------------------------------------------
 function copyOf<T>(value: T): T {
+  // cast (any-registry): a JSON round-trip of JSON-shaped show data (strings, numbers, booleans,
+  // arrays, plain objects) returns the same shape; callers pass only such data.
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
@@ -153,9 +170,14 @@ function restoreNodeField(n: ShowNode, field: HistoryField, value: unknown): voi
       n[field] = value === true;
       break;
     case "endScreen":
+      // cast (any-registry): history values are recorded from the node after the reducer normalized
+      // it (reduce.ts, put(…, entry.node[field], …)), so an endScreen value is a normalized
+      // EndScreen.
       n.endScreen = copyOf(value as EndScreen);
       break;
     case "choices":
+      // cast (any-registry): history values for choices are recorded after cloneChoices normalized
+      // them (reduce.ts, node-choices-set), so this is a Choice[].
       n.choices = copyOf(value as Choice[]);
       break;
     case "startNode":
@@ -728,7 +750,7 @@ function renderChoice(n: ShowNode, c: Choice, idx: number): HTMLElement {
       ),
     ]),
     el("div", { class: "row" }, [
-      el("div", { class: "field" }, [el("label", { text: "Style" }), styleSel]),
+      field("Style", styleSel),
       el("div", { class: "field" }, [
         el("label", { text: "Default" }),
         el("label", { class: "check" }, [defInput, el("span", { class: "mini", text: "auto-advance after countdown" })]),
@@ -884,6 +906,8 @@ async function save(): Promise<void> {
 // folder chooser; otherwise it goes to Downloads. (A native folder+name "Save As" dialog from a
 // web page requires the File System Access API, which not every browser implements well.)
 function fsaSaveWorks(): boolean {
+  // cast (any-registry): userAgentData isn't in TypeScript's DOM lib; UaDataNavigator declares it
+  // optional and the code checks it before use.
   const uad = (navigator as UaDataNavigator).userAgentData;
   return !!(
     fsa.showSaveFilePicker &&

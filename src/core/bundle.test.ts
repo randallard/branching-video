@@ -7,6 +7,8 @@ import { arbitraryEvents } from "./arbitraries.test-util.ts";
 const EXPORTED_AT = "2026-09-15T12:00:00.000Z";
 
 const roundTrip = (events: Parameters<typeof serializeBundle>[0]): ReturnType<typeof parseBundle> =>
+  // cast (any-registry): JSON.parse returns any; widening it to unknown claims nothing, and the
+  // test narrows it before use.
   parseBundle(JSON.parse(serializeBundle(events, EXPORTED_AT)) as unknown);
 
 describe("event bundles", () => {
@@ -49,6 +51,8 @@ describe("event bundles", () => {
   });
 
   it("recognises its own format", () => {
+    // cast (any-registry): JSON.parse returns any; the test reads named keys and asserts their
+    // values, so a wrong shape fails the expect.
     const bundle = JSON.parse(serializeBundle([], EXPORTED_AT)) as Record<string, unknown>;
     expect(bundle["format"]).toBe(BUNDLE_FORMAT);
     expect(isEventBundle(bundle)).toBe(true);

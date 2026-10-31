@@ -574,11 +574,26 @@ function mkChoiceItem(cfg: ShowConfig, node: ShowNode, c: Choice, idx: number): 
   return wrap;
 }
 
+let fieldLabelSeq = 0;
+
+/** The form control a field labels: the control itself, or the single one inside a wrapper. */
+function labelTarget(control: HTMLElement): HTMLElement | null {
+  if (control.matches("input, select, textarea")) return control;
+  const inner = control.querySelectorAll<HTMLElement>("input, select, textarea");
+  return inner.length === 1 ? (inner[0] ?? null) : null;
+}
+
 function mkField(labelText: string, control: HTMLElement, hint?: string, history?: MountedHistory): HTMLElement {
   const f = document.createElement("div");
   f.className = "field";
   const l = document.createElement("label");
-  l.textContent = labelText;
+  // The visible label names its control (ADR-0033), through its text alone, so the history
+  // badge ("⟲ 2") isn't read as part of the field's name.
+  const text = document.createElement("span");
+  text.id = `field-label-${String(++fieldLabelSeq)}`;
+  text.textContent = labelText;
+  l.appendChild(text);
+  labelTarget(control)?.setAttribute("aria-labelledby", text.id);
   if (history) l.appendChild(history.badge);
   f.appendChild(l);
   f.appendChild(control);
@@ -639,6 +654,8 @@ function restoreNodeField(node: ShowNode, field: HistoryField, value: unknown): 
       if (typeof value === "number") node[field] = value;
       break;
     case "choices":
+      // cast (any-registry): choices history values are recorded after the reducer's cloneChoices
+      // normalized them, and a JSON round-trip of a Choice[] is a Choice[].
       node.choices = JSON.parse(JSON.stringify(value)) as Choice[];
       break;
     // Studio doesn't edit these, so it never mounts a history for them.
