@@ -4,6 +4,8 @@ _Last updated: 2026-10-31_
 
 ## Status / next
 
+**2026-10-31 (standards) — inherited ADRs 1000–1018, and conformance** on `inherit-standards-1000-1018`: the template's standards ADRs and current `project-conventions`/`stance-review` skills, byte-identical (`2264d9b`); then CI brought into line (`47e7d92`): timeouts on every job (1005), Node 24 (1013, was T4), the template's gitleaks secret scan (99 commits, no leaks), the Rust jobs deleted (1004; ADR-0004 is the opt-out), `strictDepBuilds` stated (1016). Already conformed: 1010, 1011, lint, the pnpm gates, OSV v2.7.0 (1018). **Open, for Ryan:** ADR-1012's two extras (T3 below); an ADR-1017 look at whether the Editor/Studio pages want screen reducers; a first stance review. Renovate #2 (pin CI Node to 22.23.4) is superseded by the Node 24 move. See [journal](journal/2026-10-31-3-inherited-standards.md).
+
 **2026-10-31 (later) — the unscheduled backlog, built** on branch `backlog-unscheduled`: a favicon (`8b652b4`), a lone default choice advances without choice UI ([ADR-0031](adr/0031-a-lone-default-choice-advances-without-choice-ui.md), `fe60967`), overlapping node times warned in the validator and Studio (`a52e2ff`), and the chapter menu grouped into main chapters and deep dives (`c19df34`). Mermaid chapter maps dropped (Ryan). 145 unit, 72 e2e. **Next:** merge that PR, check Big Buck Bunny's now-seamless `intro`/`chapter-2` cuts and the grouped menu live, then the five manual checks. See [journal](journal/2026-10-31-2-unscheduled-backlog.md).
 
 **2026-10-31 — the PR backlog is cleared.** #20 (advisories, ADR-0030) and #21 (ADR-0029 handoffs by show id) are merged, in that order, plus Renovate #8–#11, #15, #23. #20 needed 11 more advisories cleared first; glob and minimatch are overridden across a major (the one deliberate exception, explained in `pnpm-workspace.yaml`). This PR adds `rolldownOptions` (unblocks #16) and stops Renovate pinning override and engine ranges (#2). **Still open:** #16 (merge once rebased), #2 (re-check that it shrinks to the `node-version` pin), #6/#7 (one-day age gate only). Then the five manual checks (item 3 under **Next**) and the tooling-trial items in the Worklist. See [journal](journal/2026-10-31-backlog-cleared.md).
@@ -417,9 +419,12 @@ Tooling trial, not yet scheduled (from `work/typescript-review`, proposal T2, 20
   will now be offered: an **`any` registry** (each `any`/`as` justified inline and listed in
   `docs/any-registry.md`) and **jsx-a11y**-style accessibility lint (a vanilla-DOM app, so it
   would be axe/Playwright checks rather than a JSX plugin). Record the answer as an ADR either
-  way.
-- **Node 22 → 24** (T4, accepted): `node-version` in `ci.yml` and the `engines` floor. Node 22
-  goes EOL 2027-04-30.
+  way. **Now an inherited obligation** (ADR-1012, copied in 2026-10-31). For reference, cycle-in
+  answered yes to both on 2026-10-31 (its ADR-0018 cast registry with a CI check; ADR-0019 axe in
+  light and dark, which found a contrast failure in both themes). This repo already has the
+  Playwright suite axe would run in.
+- ~~**Node 22 → 24** (T4, accepted).~~ Done 2026-10-31 (`47e7d92`): `node-version: 24` in CI, `engines`
+  floor `>=24.0.0` (ADR-1013).
 
 ## Open questions
 
