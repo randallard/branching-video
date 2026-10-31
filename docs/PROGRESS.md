@@ -4,6 +4,8 @@ _Last updated: 2026-10-31_
 
 ## Status / next
 
+**2026-10-31 (1012/1017/review) — Ryan's three follow-ups** on `adopt-1012-extras`: (1) both ADR-1012 extras adopted: the cast registry (ADR-0032; 39 casts → 25, all justified, `pnpm casts` in CI) and axe on every page (ADR-0033; fixed button/hint/link contrast, unlabelled Editor and Studio fields, an unfocusable node list); (2) an ADR-1017 look, which found the player's position state is the case 1017 targets and the Editor/Studio working copy is an unrecorded exception; (3) the first [stance review](reviews/2026-10-31-stance-review.md). **Next, Ryan's call:** a player reducer (ADR + change); an ADR recording the Editor/Studio working copy; pnpm 12 (trialled, viable). T3 is answered. See [journal](journal/2026-10-31-4-1012-extras-1017-look-stance-review.md).
+
 **2026-10-31 (standards) — inherited ADRs 1000–1018, and conformance** on `inherit-standards-1000-1018`: the template's standards ADRs and current `project-conventions`/`stance-review` skills, byte-identical (`2264d9b`); then CI brought into line (`47e7d92`): timeouts on every job (1005), Node 24 (1013, was T4), the template's gitleaks secret scan (99 commits, no leaks), the Rust jobs deleted (1004; ADR-0004 is the opt-out), `strictDepBuilds` stated (1016). Already conformed: 1010, 1011, lint, the pnpm gates, OSV v2.7.0 (1018). **Open, for Ryan:** ADR-1012's two extras (T3 below); an ADR-1017 look at whether the Editor/Studio pages want screen reducers; a first stance review. Renovate #2 (pin CI Node to 22.23.4) is superseded by the Node 24 move. See [journal](journal/2026-10-31-3-inherited-standards.md).
 
 **2026-10-31 (later) — the unscheduled backlog, built** on branch `backlog-unscheduled`: a favicon (`8b652b4`), a lone default choice advances without choice UI ([ADR-0031](adr/0031-a-lone-default-choice-advances-without-choice-ui.md), `fe60967`), overlapping node times warned in the validator and Studio (`a52e2ff`), and the chapter menu grouped into main chapters and deep dives (`c19df34`). Mermaid chapter maps dropped (Ryan). 145 unit, 72 e2e. **Next:** merge that PR, check Big Buck Bunny's now-seamless `intro`/`chapter-2` cuts and the grouped menu live, then the five manual checks. See [journal](journal/2026-10-31-2-unscheduled-backlog.md).
@@ -414,7 +416,7 @@ Tooling trial, not yet scheduled (from `work/typescript-review`, proposal T2, 20
   `strictTypeChecked` plus `no-non-null-assertion`, `switch-exhaustiveness-check` and
   `no-floating-promises` as errors); compare the findings. Change nothing in CI yet. Record the
   result here and in `work/typescript-review`. A pass is one of T1's two exit triggers.
-- **Discuss: adopt Engineering-Strategy's opt-in TS extras here?** (T3, 2026-10-20). This repo
+- ~~**Discuss: adopt Engineering-Strategy's opt-in TS extras here?** (T3, 2026-10-20).~~ **Answered 2026-10-31: yes to both** (ADR-0032, ADR-0033). This repo
   already meets the template's lifted bar. The open question is the two opt-ins every new project
   will now be offered: an **`any` registry** (each `any`/`as` justified inline and listed in
   `docs/any-registry.md`) and **jsx-a11y**-style accessibility lint (a vanilla-DOM app, so it
