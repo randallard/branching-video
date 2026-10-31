@@ -126,8 +126,6 @@ function watch(page: Page, device: Omit<Device, "page">): void {
   });
   page.on("console", (m) => {
     if (m.type() !== "error") return;
-    // No favicon yet — a known 404 on every page (PROGRESS.md, "found in slice 2").
-    if (m.location().url.endsWith("/favicon.ico")) return;
     device.errors.push(`${m.text()} ${m.location().url}`);
   });
 }
