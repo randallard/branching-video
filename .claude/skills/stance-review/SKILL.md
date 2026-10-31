@@ -48,10 +48,15 @@ Work `docs/reviews/README.md`'s checklist. Concretely:
 4. **Advisories** — anything new in our dependency classes since the last review.
 5. **Rigor tier** — has the core grown an invariant that deserves promotion? In a TS project,
    is there now something that genuinely wants a proof rather than a property test?
-6. **Template drift** —
-   `git fetch template && git log --oneline HEAD..template/main -- docs/ .github/`
-   (if no `template` remote: `git remote add template <template-url>`).
-7. **Last review's deferrals** — did the thing they were waiting on land?
+6. **Template drift**:
+   `git fetch template && git log --oneline HEAD..template/main -- docs/ .github/ .claude .cargo`
+   (if there's no `template` remote: `git remote add template <template-url>`). **New inherited
+   standards ADRs** are the main thing to look for: list `docs/adr/1*.md` on `template/main` that
+   this repo lacks. Each one is a standard change to adopt, or to deviate from in a project ADR
+   (ADR-1000).
+7. **Last review's deferrals**: did the thing they were waiting on land?
+8. **Package-manager majors**: is a new pnpm or Cargo major out? Evaluate it here before
+   `packageManager` or the toolchain moves (ADR-1016).
 
 ## Recording it
 
