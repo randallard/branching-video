@@ -324,6 +324,7 @@ function onSegmentEnded(): void {
       if (ctx) navigateTo(ctx.nodeId, ctx.currentTime);
       return;
     }
+    case "auto-advance": // One default choice: a clean cut, no button or countdown (ADR-0031)
     case "return-to": // Aside with returnTo: auto-route back to the main line
     case "continue": // No way forward: play on into the next node (ADR-0022)
       navigateTo(action.nodeId);

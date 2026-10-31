@@ -109,3 +109,4 @@ Copy [`TEMPLATE.md`](TEMPLATE.md).
 | [0028](0028-unload-backstop-in-localstorage-replayed-at-edit-time.md) | Edits not yet in IndexedDB are parked in localStorage on unload and replayed at edit time | Accepted |
 | [0029](0029-same-device-handoffs-carry-the-show-id-not-the-config.md) | Handoffs between pages on the same device carry the show id, not the config | Accepted |
 | [0030](0030-one-day-age-gate.md) | The age gate is one day, not fourteen | Accepted |
+| [0031](0031-a-lone-default-choice-advances-without-choice-ui.md) | A node whose only choice is the default advances to it without showing choices | Accepted |

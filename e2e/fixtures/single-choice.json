@@ -1,0 +1,23 @@
+{
+  "title": "E2E Single Choice",
+  "startNode": "intro",
+  "masterVideoId": "AAAAAAAAAAA",
+  "choiceDisplaySeconds": 8,
+  "nodes": [
+    {
+      "id": "intro",
+      "title": "Intro",
+      "start": 0,
+      "end": 10,
+      "choices": [{ "label": "Continue", "target": "chosen", "default": true }]
+    },
+    { "id": "skipped", "title": "Next in order", "start": 10, "end": 20, "choices": [] },
+    {
+      "id": "chosen",
+      "title": "The target",
+      "start": 20,
+      "end": 30,
+      "choices": [{ "label": "Finish", "target": "skipped" }]
+    }
+  ]
+}

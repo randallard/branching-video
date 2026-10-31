@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { normalizeConfig } from "./config.ts";
-import { continuesToNext, routeShape, segmentEndAction } from "./routing.ts";
+import { autoAdvanceTarget, continuesToNext, routeShape, segmentEndAction } from "./routing.ts";
 import { validate } from "./validate.ts";
 import { arbitraryConfig } from "./arbitraries.test-util.ts";
 
@@ -20,14 +20,59 @@ describe("segmentEndAction", () => {
     );
   });
 
-  it("shows choices exactly when a node has them", () => {
+  it("shows choices exactly when a node has them, unless its only choice is the default", () => {
     fc.assert(
       fc.property(arbitraryConfig, fc.boolean(), (config, branch) => {
         for (const node of config.nodes) {
-          expect(segmentEndAction(config, node, branch).kind === "choices").toBe(node.choices.length > 0);
+          const singleDefault = node.choices.length === 1 && node.choices[0]?.default === true;
+          expect(segmentEndAction(config, node, branch).kind === "choices").toBe(
+            node.choices.length > 0 && !singleDefault
+          );
         }
       })
     );
+  });
+
+  it("auto-advances exactly from a lone default choice, to that choice's target (ADR-0031)", () => {
+    fc.assert(
+      fc.property(arbitraryConfig, fc.boolean(), (config, branch) => {
+        for (const node of config.nodes) {
+          const action = segmentEndAction(config, node, branch);
+          const only = node.choices.length === 1 ? node.choices[0] : undefined;
+          if (only?.default === true) {
+            expect(action).toEqual({ kind: "auto-advance", nodeId: only.target });
+          } else {
+            expect(action.kind).not.toBe("auto-advance");
+            expect(autoAdvanceTarget(node)).toBeUndefined();
+          }
+        }
+      })
+    );
+  });
+
+  it("auto-advances Big Buck Bunny's single-Continue nodes but keeps a real fork", () => {
+    const config = normalizeConfig({
+      title: "t",
+      startNode: "intro",
+      nodes: [
+        { id: "intro", choices: [{ label: "Continue", target: "fork", default: true }] },
+        {
+          id: "fork",
+          choices: [
+            { label: "Deep dive", target: "aside" },
+            { label: "Continue", target: "end", default: true },
+          ],
+        },
+        { id: "aside", isAside: true, returnTo: "fork", choices: [] },
+        { id: "nudge", choices: [{ label: "Next", target: "end" }] },
+        { id: "end", choices: [] },
+      ],
+    })!;
+    const [intro, fork, , nudge] = config.nodes;
+    expect(segmentEndAction(config, intro!, false)).toEqual({ kind: "auto-advance", nodeId: "fork" });
+    expect(segmentEndAction(config, fork!, false).kind).toBe("choices");
+    // One choice that isn't the default has no countdown to skip: the viewer still decides.
+    expect(segmentEndAction(config, nudge!, false).kind).toBe("choices");
   });
 
   it("agrees with continuesToNext whenever there is no branch point to resume", () => {
@@ -81,3 +126,4 @@ describe("segmentEndAction", () => {
     expect(segmentEndAction(config, end!, false).kind).toBe("end-screen");
   });
 });
+

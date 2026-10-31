@@ -55,6 +55,33 @@ test("choices appear when a segment ends, and the default fires after the countd
   await expect(choices(page)).toHaveCount(0);
 });
 
+test("a lone default choice cuts straight to its target, with no button or countdown (ADR-0031)", async ({
+  app: { page },
+}) => {
+  // Record every choice button ever rendered, so a button that flashes up and vanishes fails too.
+  await page.addInitScript(() => {
+    const seen: string[] = [];
+    (window as unknown as { __buttons: string[] }).__buttons = seen;
+    new MutationObserver((records) => {
+      for (const r of records)
+        for (const n of r.addedNodes)
+          if (n instanceof HTMLElement && n.classList.contains("choice-btn")) seen.push(n.textContent);
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await play(page, "single-choice.json");
+  await expect(nodeTitle(page)).toHaveText("Intro");
+  await ytJump(page, 9.9);
+  // Its target, not the next node in order, and well inside the 8 s countdown it used to wait out.
+  await expect(nodeTitle(page)).toHaveText("The target", { timeout: 2000 });
+  expect(await ytTime(page)).toBeGreaterThanOrEqual(20);
+  await expect(page.locator("#choices")).not.toHaveClass(/visible/);
+  expect(await page.evaluate(() => (window as unknown as { __buttons: string[] }).__buttons)).toEqual([]);
+
+  // A single choice that isn't the default still waits for the viewer.
+  await ytJump(page, 29.9);
+  await expect(choices(page)).toHaveText(["Finish"]);
+});
+
 test("clicking a choice goes to its target", async ({ app: { page } }) => {
   await play(page, "branching.json");
   await ytJump(page, 9.9);
