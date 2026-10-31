@@ -68,3 +68,33 @@ export function segmentEndAction(
   return next ? { kind: "continue", nodeId: next.id } : { kind: "wrap" };
 }
 
+/** A node that plays straight into another which starts inside its range on the same video, so
+ * the viewer sees `replay` seconds twice. */
+export interface PlayOnOverlap {
+  from: string;
+  fromEnd: number;
+  to: string;
+  toStart: number;
+  replay: number;
+}
+
+/** Every unconditional segment-end hop — `continue` (ADR-0022) or `auto-advance` (ADR-0031) —
+ * whose target starts inside the source's range on the same video. A jump to elsewhere in the
+ * video, before the source's start, is not an overlap. */
+export function playOnOverlaps(config: ShowConfig): PlayOnOverlap[] {
+  const byId = new Map(config.nodes.map((n) => [n.id, n]));
+  const out: PlayOnOverlap[] = [];
+  for (const a of config.nodes) {
+    if (a.end === undefined) continue;
+    const action = segmentEndAction(config, a, false);
+    if (action.kind !== "continue" && action.kind !== "auto-advance") continue;
+    const b = byId.get(action.nodeId);
+    if (!b || (a.videoId ?? config.masterVideoId) !== (b.videoId ?? config.masterVideoId)) continue;
+    const aStart = a.start ?? 0;
+    const bStart = b.start ?? 0;
+    if (aStart <= bStart && bStart < a.end) {
+      out.push({ from: a.id, fromEnd: a.end, to: b.id, toStart: bStart, replay: a.end - bStart });
+    }
+  }
+  return out;
+}

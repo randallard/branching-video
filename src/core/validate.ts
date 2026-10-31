@@ -5,9 +5,9 @@
  * Works on the *raw* parsed JSON, not the normalized model: its job is to report values of the
  * wrong type, which normalization would silently drop. Never throws, whatever the input.
  */
-import { isRecord } from "./config.ts";
+import { isRecord, normalizeConfig } from "./config.ts";
 import type { JsonRecord } from "./config.ts";
-import { continuesToNext } from "./routing.ts";
+import { continuesToNext, playOnOverlaps } from "./routing.ts";
 import type { RouteShape } from "./routing.ts";
 
 export interface ValidationResult {
@@ -209,6 +209,16 @@ export function validate(rawConfig: unknown): ValidationResult {
   const last = nodes[nodes.length - 1];
   if (last && continuesToNext(shapeOf(last))) {
     warn(`node "${show(last["id"])}" is the last node and has no choices, aside returnTo, or endScreen — viewer will see generic "Watch again" screen`);
+  }
+
+  // A node that plays straight on into one starting inside it shows that stretch twice. Only on a
+  // config without errors: the check reads the normalized model, which drops ill-typed values.
+  const normalized = errors.length === 0 ? normalizeConfig(stripped) : null;
+  for (const o of normalized ? playOnOverlaps(normalized) : []) {
+    warn(
+      `node "${o.to}" starts at ${String(o.toStart)}, before "${o.from}" ends at ${String(o.fromEnd)} — ` +
+        `${o.replay.toFixed(1)} s plays twice when it plays on`
+    );
   }
 
   return { errors, warnings, nodeCount: nodes.length, uniqueIds: seenIds.size };

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { normalizeConfig } from "./config.ts";
-import { autoAdvanceTarget, continuesToNext, routeShape, segmentEndAction } from "./routing.ts";
+import { autoAdvanceTarget, continuesToNext, playOnOverlaps, routeShape, segmentEndAction } from "./routing.ts";
 import { validate } from "./validate.ts";
 import { arbitraryConfig } from "./arbitraries.test-util.ts";
 
@@ -124,6 +124,67 @@ describe("segmentEndAction", () => {
     expect(segmentEndAction(config, aside!, true).kind).toBe("resume-branch");
     expect(segmentEndAction(config, aside!, false)).toEqual({ kind: "return-to", nodeId: "main" });
     expect(segmentEndAction(config, end!, false).kind).toBe("end-screen");
+  });
+});
+
+describe("playOnOverlaps", () => {
+  it("reports only real play-on hops whose target starts inside the source, on the same video", () => {
+    fc.assert(
+      fc.property(arbitraryConfig, (config) => {
+        // Duplicate ids are a validation error, and the validator only looks for overlaps on a
+        // config without errors, so an id must name exactly one node here.
+        fc.pre(new Set(config.nodes.map((n) => n.id)).size === config.nodes.length);
+        const byId = new Map(config.nodes.map((n) => [n.id, n]));
+        for (const o of playOnOverlaps(config)) {
+          const a = byId.get(o.from)!;
+          const b = byId.get(o.to)!;
+          const action = segmentEndAction(config, a, false);
+          expect(["continue", "auto-advance"]).toContain(action.kind);
+          expect("nodeId" in action && action.nodeId).toBe(b.id);
+          expect(a.videoId ?? config.masterVideoId).toBe(b.videoId ?? config.masterVideoId);
+          expect(a.start ?? 0).toBeLessThanOrEqual(o.toStart);
+          expect(o.toStart).toBeLessThan(o.fromEnd);
+          expect(o.replay).toBeCloseTo(o.fromEnd - o.toStart);
+          expect(o.replay).toBeGreaterThan(0);
+        }
+      }),
+      // Overlaps are rare in generated configs (~1 in 120 with unique ids), so look at plenty.
+      { numRuns: 2000 }
+    );
+  });
+
+  it("flags a start inside the node before it, and nothing else", () => {
+    const config = normalizeConfig({
+      title: "t",
+      startNode: "a",
+      masterVideoId: "AAAAAAAAAAA",
+      nodes: [
+        { id: "a", start: 0, end: 10, choices: [] },
+        { id: "b", start: 10, end: 20, choices: [] }, // contiguous: fine
+        { id: "c", start: 19.8, end: 30, choices: [] }, // starts inside b: 0.2 s twice
+        { id: "d", videoId: "BBBBBBBBBBB", start: 5, end: 9, choices: [] }, // another video
+        { id: "e", start: 2, end: 4, choices: [] }, // jumps back before d's start: a cut, not overlap
+        { id: "f", start: 4, end: 8, choices: [{ label: "x", target: "a" }, { label: "y", target: "b" }] },
+        { id: "g", start: 7, end: 9, choices: [] }, // after a fork: no play-on edge into it
+      ],
+    })!;
+    const found = playOnOverlaps(config);
+    expect(found.map(({ from, to }) => [from, to])).toEqual([["b", "c"]]);
+    expect(found[0]?.replay).toBeCloseTo(0.2);
+  });
+
+  it("follows a lone default choice too (ADR-0031)", () => {
+    const config = normalizeConfig({
+      title: "t",
+      startNode: "a",
+      masterVideoId: "AAAAAAAAAAA",
+      nodes: [
+        { id: "a", start: 0, end: 10, choices: [{ label: "Continue", target: "c", default: true }] },
+        { id: "b", start: 50, end: 60, choices: [] },
+        { id: "c", start: 9, end: 20, choices: [] },
+      ],
+    })!;
+    expect(playOnOverlaps(config).map(({ from, to }) => [from, to])).toEqual([["a", "c"]]);
   });
 });
 

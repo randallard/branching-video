@@ -95,6 +95,21 @@ test("transport: play/pause button, Space, and arrow-key seeking", async ({ app:
   expect(await ytTime(page)).toBeCloseTo(16, 1);
 });
 
+test("a node starting inside the one that plays into it is flagged on its start time", async ({
+  app: { page },
+}) => {
+  await gotoStudio(page);
+  await importUkulele(page);
+  // The real file: "major-scale" starts at 399.2, "strumming-count-concise" before it ends at 399.4.
+  const flags = page.locator("#nodeTableBody td.td-time .unresolved");
+  await expect(flags).toHaveCount(1);
+  await expect(cell(page, 7, 0)).toHaveText("major-scale");
+  await expect(cell(page, 7, 2).locator(".unresolved")).toHaveAttribute(
+    "title",
+    /Starts before "strumming-count-concise" ends .*: 0\.2 s plays twice/
+  );
+});
+
 test("Import config JSON asks update-or-add for a same-titled draft", async ({ app: { page, dialogs } }) => {
   await gotoStudio(page);
   await importUkulele(page);
