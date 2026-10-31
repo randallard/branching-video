@@ -5,10 +5,12 @@ import {
   UKULELE_TITLE,
   VIDEO_TITLE,
   badge,
+  draftTitles,
   expect,
   field,
   fixture,
   gotoEditor,
+  gotoHome,
   historyValues,
   openDraftInEditor,
   reopenUntil,
@@ -303,4 +305,58 @@ test("Open in Studio needs a master video", async ({ app: { page, dialogs } }) =
   await showField(page, "Master video ID").locator("input").fill("");
   await page.locator("#studioBtn").click();
   await dialogs.alert(/Studio works from a single master video/);
+});
+
+test("Open in Studio carries an edit still in its burst, even if the Editor's write never lands (ADR-0029)", async ({
+  app,
+}) => {
+  const { page, context } = app;
+  await load(page, "branching.json", "E2E Branching");
+  // As in the unload-backstop test: only the parked copy can carry the edit to Studio.
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- re-applied to each instance below
+    const transaction = IDBDatabase.prototype.transaction;
+    IDBDatabase.prototype.transaction = function (this: IDBDatabase, ...args: Parameters<typeof transaction>) {
+      if (args[1] === "readwrite") throw new Error("simulated: write lost");
+      return transaction.apply(this, args);
+    };
+  });
+  app.allow.push(/simulated: write lost/);
+
+  await nodeField(page, "Title").locator("input").fill("Typed just before the handoff");
+  const popup = context.waitForEvent("page");
+  await page.locator("#studioBtn").click();
+  const studio = await popup;
+  await expect(studio.locator("#workspace")).toBeVisible();
+  await expect(studio.locator("#nodeTableBody tr").first().locator("td").nth(1)).toHaveText(
+    "Typed just before the handoff"
+  );
+});
+
+test("Open in Studio from the untouched example makes exactly one draft", async ({ app: { page, context } }) => {
+  await gotoEditor(page);
+  const popup = context.waitForEvent("page");
+  await page.locator("#studioBtn").click();
+  const studio = await popup;
+  await expect(studio.locator("#workspace")).toBeVisible();
+  await expect(studio.locator("#nodeTableBody tr").first().locator("td").nth(1)).toHaveText("Intro (0-30s)");
+
+  await gotoHome(page);
+  await expect(draftTitles(page)).toHaveText(["Branching Test — Big Buck Bunny"]);
+});
+
+test("the open draft is in the URL, so a reload reopens it (ADR-0029)", async ({ app: { page } }) => {
+  await load(page, "branching.json", "E2E Branching");
+  expect(new URL(page.url()).hash).toMatch(/^#show=/);
+  await page.reload();
+  await expect(showField(page, "Title").locator("input")).toHaveValue("E2E Branching");
+});
+
+test("a #show= link to a draft this browser doesn't have says so and loads the example", async ({
+  app: { page, dialogs },
+}) => {
+  await page.goto("editor.html#show=not-a-draft-here");
+  await dialogs.alert(/isn't in this browser's drafts/);
+  await expect(showField(page, "Title").locator("input")).toHaveValue("Branching Test — Big Buck Bunny");
+  expect(new URL(page.url()).hash).toBe("");
 });

@@ -2,13 +2,14 @@
 import { isRecord, normalizeConfig } from "../core/config.ts";
 import type { Choice, EndLink, EndScreen, ShowConfig, ShowNode } from "../core/config.ts";
 import { serialize as serializeConfig, toFileText } from "../core/serialize.ts";
+import { parseShowHash } from "../core/handoff.ts";
 import { extractVideoId, slugify, uniqueId } from "../core/text.ts";
 import { validate } from "../core/validate.ts";
 import type { ValidationResult } from "../core/validate.ts";
-import { getTransfer, setTransfer } from "../shell/drafts.ts";
 import { adoptExternalConfig, DraftSession, guardAgainstUnload } from "../shell/draft-session.ts";
 import type { DraftStore } from "../shell/draft-store.ts";
 import { openDraftStore } from "../shell/draft-store.ts";
+import { handOff, MISSING_DRAFT_TEXT, syncShowHash } from "../shell/handoff.ts";
 import { errorMessage, readFileText } from "../shell/files.ts";
 import { SHOWS_DIR, fetchShows, fetchVideoTitle } from "../shell/shows.ts";
 import { notifyCollisions } from "../ui/collisions.ts";
@@ -176,12 +177,15 @@ function numOrUndefined(v: string): number | undefined {
  * paths (loadConfig/adoptConfig/openDraft) render without calling this: opening a page, or a
  * config already saved by import, must not itself spawn a new draft. */
 async function persistNow(): Promise<void> {
-  await session.persist(config);
+  const saved = session.persist(config);
+  syncShowHash(session.showId); // a new show has its id from the first edit (ADR-0028)
+  await saved;
 }
 
 /** For typing: written once the burst pauses, so a field gets one event, not one per keystroke. */
 function persistSoon(): void {
   session.persistSoon(config);
+  syncShowHash(session.showId);
 }
 
 function renderAll(): void {
@@ -829,6 +833,7 @@ function loadConfig(obj: unknown, name?: string): void {
   selectedId = config.nodes[0]?.id ?? null;
   fileHandle = null; // loaded by value; openFile() reattaches a handle if it has one
   session.reset();
+  syncShowHash(null);
   if (name) {
     fileName = name;
     setFilename(name);
@@ -957,6 +962,7 @@ async function adoptConfig(raw: unknown, name?: string): Promise<void> {
     return;
   }
   session.attach(outcome.showId, outcome.nodeKeys);
+  syncShowHash(outcome.showId);
   config = outcome.config;
   selectedId = config.nodes[0]?.id ?? null;
   fileHandle = null;
@@ -1003,10 +1009,11 @@ function openMyDraftsMenu(): void {
   }
 }
 
-function openDraft(showId: string): void {
+function openDraft(showId: string): boolean {
   const working = draftStore.open(showId);
-  if (!working) return;
+  if (!working) return false;
   session.attach(showId, working.nodeKeys);
+  syncShowHash(showId);
   config = working.config;
   selectedId = config.nodes[0]?.id ?? null;
   fileHandle = null;
@@ -1014,6 +1021,7 @@ function openDraft(showId: string): void {
   setFilename(config.title || "Untitled draft");
   renderAll();
   updateSaveLabel();
+  return true;
 }
 
 // ---- Configs menu (published shows, from live/manifest.json) --------------------------------
@@ -1211,8 +1219,7 @@ button("studioBtn").addEventListener("click", () => {
     alert('Studio works from a single master video. Set "Master video ID" in show settings first.');
     return;
   }
-  setTransfer(serialize());
-  window.open("studio.html#transfer", "_blank");
+  handOff(session, config, "studio.html");
 });
 
 // The store opens asynchronously (IndexedDB), so every action that touches it — including the
@@ -1231,7 +1238,7 @@ const bootGatedButtons = [
 ].map(button);
 for (const b of bootGatedButtons) b.disabled = true;
 
-// If opened via Studio "Open in Editor", consume the transfer key from localStorage; otherwise
+// Open the draft named in the URL (a handoff from Studio or the home page, or a reload); otherwise
 // preload the config.json next to this page.
 async function boot(): Promise<void> {
   draftStore = await openDraftStore();
@@ -1250,13 +1257,11 @@ async function boot(): Promise<void> {
   await notifyCollisions(draftStore);
   for (const b of bootGatedButtons) b.disabled = false;
 
-  if (location.hash === "#transfer") {
-    history.replaceState(null, "", location.pathname + location.search);
-    const raw = getTransfer();
-    if (raw !== null) {
-      await adoptConfig(raw, "transfer.json");
-      return;
-    }
+  // Another page handed us a draft by id, or this is a reload of one (ADR-0029).
+  const handed = parseShowHash(location.hash);
+  if (handed !== null) {
+    if (openDraft(handed)) return;
+    alert(MISSING_DRAFT_TEXT);
   }
   try {
     const r = await fetch("config.json");

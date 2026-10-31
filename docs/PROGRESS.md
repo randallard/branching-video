@@ -178,22 +178,43 @@ plus a browser test that makes the closing tab's writes fail; both the key unit 
 browser test fail with the mechanism removed. See
 [journal 2026-09-19 (4)](journal/2026-09-19-4-unload-backstop.md).
 
+**2026-09-26 — backstop checked in Chrome; PR #18 open, all checks green.** With IndexedDB writes
+forced to fail, an edit typed just before the tab closed came back with ⟲ 1 and no leftover
+`bvp:unsaved:*` key. Adding a node and closing at once left exactly one copy. Ryan's report of
+"two same-titled drafts, no badge" was not the backstop. It was the Studio↔Editor `#transfer`
+import (ADR-0011's update-or-add prompt), which can also **revert newer edits with a stale
+copy**. That happens on `main` too; it's item 1 below. See
+[journal 2026-09-26](journal/2026-09-26-backstop-browser-check-and-transfer-revert.md).
+
 **Next:**
-0. **Re-run #15** once this fix is on `main`. `main` requires branches to be up to date, so
+0. **Merge PR #18** (`editor-unload-backstop`). Still unrun by hand: manual step 4 (a stale
+   hide-time copy doesn't win, which needs a real tab switch) and step 5 (Studio).
+1. **The `#transfer` handoff can revert edits.** "Open in Studio"/"Open in Editor" import the
+   whole config as a snapshot. A stale sending tab plus "OK, update" overwrites newer fields, and
+   "Cancel" makes a same-titled duplicate. **Decided in
+   [ADR-0029](adr/0029-same-device-handoffs-carry-the-show-id-not-the-config.md) (accepted
+   2026-09-26, branch `transfer-handoff-by-show-id`):** every handoff, the home page's Studio link
+   included, opens `#show=<id>`, with the sender parking its unsaved edits through the ADR-0028
+   backstop first; `bvp:resume` goes. **Built, not yet committed** (waiting on Ryan's local
+   check): 138 unit, 69 e2e, checked in Chrome with a stale Studio tab. Also fixed a
+   take-after-read race in `openDraftStore()`. See
+   [journal 2026-09-26 (2)](journal/2026-09-26-2-handoffs-by-show-id.md). Then commit, and open
+   a PR stacked on #18 (or rebase onto `main` once #18 merges).
+2. **Re-run #15** once this fix is on `main`. `main` requires branches to be up to date, so
    Renovate will rebase #15 itself (or tick its rebase box), and CI re-runs then.
-1. **The five manual checks** in [`e2e/README.md`](../e2e/README.md#what-stays-manual): real
+3. **The five manual checks** in [`e2e/README.md`](../e2e/README.md#what-stays-manual): real
    YouTube playback feel, Studio against a real video, a real phone, the native Save As dialog,
    and reading `create.html` as a newcomer. That list replaces the long "click through the
    unverified list" item that used to be here; everything else on it is now a test.
-2. ~~Slice 3b part 3~~ done 2026-09-18. ~~ADR-0026 (CSP)~~ done 2026-09-18. ~~Branch
+4. ~~Slice 3b part 3~~ done 2026-09-18. ~~ADR-0026 (CSP)~~ done 2026-09-18. ~~Branch
    protection, Renovate~~ done 2026-09-18 (a direct `git push` to `main` is rejected without
    the admin bypass).
-3. ~~Slice 4~~: ADR-0024 UI delivered in 3b.3, ADR-0023 merged 2026-09-19 (PR #13).
+5. ~~Slice 4~~: ADR-0024 UI delivered in 3b.3, ADR-0023 merged 2026-09-19 (PR #13).
    The Editor's 1 s edit burst left a window where leaving the page right after typing relied on
    a best-effort `pagehide` flush. It now also flushes on `focusout`, which runs before a link
    click navigates (2026-09-19 (3)), and parks unsaved edits in `localStorage` on hide/unload for
    the next page to replay ([ADR-0028](adr/0028-unload-backstop-in-localstorage-replayed-at-edit-time.md)).
-4. After that: **nothing planned is left in the migration.** The "not yet scheduled" lists under
+6. After that: **nothing planned is left in the migration.** The "not yet scheduled" lists under
    Worklist are what remains to pick from.
 
 **Why this started:** Ryan wanted to load previously exported single-show configs (e.g.
