@@ -4,6 +4,11 @@
 # individually, never blanket-approved. None needed today.
 onlyBuiltDependencies: []
 
+# ADR-1016: fail the install when a dependency has a build script that isn't allowed above,
+# rather than skipping it quietly. pnpm's default and part of its recommended baseline, set
+# explicitly here like the other gates.
+strictDepBuilds: true
+
 # ADR-0030 (supersedes ADR-0014): quarantine new releases for 1 day (in minutes), matched to
 # renovate.json's minimumReleaseAge. This gates every install, including a manual `pnpm add`;
 # the Renovate setting only paces Renovate's own PRs.

@@ -27,6 +27,7 @@ jobs:
   detect:
     name: detect languages
     runs-on: ubuntu-latest
+    timeout-minutes: 15 # ADR-1005
     outputs:
       rust: ${{ steps.d.outputs.rust }}
       ts: ${{ steps.d.outputs.ts }}
@@ -45,56 +46,9 @@ jobs:
           echo "rust=$rust ts=$ts"
 
   # ── Rust ────────────────────────────────────────────────────────────────────
-  rust-gates:
-    name: rust fast gates
-    needs: detect
-    if: needs.detect.outputs.rust == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable (branch!)
-        with:
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-      - name: fmt
-        run: cargo fmt --all --check
-      - name: clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-      - name: test
-        run: cargo test --all-features
-
-  rust-proofs:
-    name: rust proofs (kani)
-    needs: detect
-    if: needs.detect.outputs.rust == 'true'
-    runs-on: ubuntu-latest
-    # Deliberately its own job: a slow or cranky proof run must never delay the
-    # fast-gate feedback loop, and a separate check name says at a glance which
-    # tier failed. Runs on every push — no paths filter, no schedule.
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: model-checking/kani-github-action@f838096619a707b0f6b2118cf435eaccfa33e51f # v1.1
-        with:
-          # Point this at the pure core crate. Kani needs zero annotations to
-          # give you panic-freedom, so this earns its place from day one.
-          args: --workspace
-
-  rust-supply-chain:
-    name: rust supply chain
-    needs: detect
-    if: needs.detect.outputs.rust == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
-        with:
-          command: check licenses bans sources advisories
+  # None. ADR-0004 rejects a Rust/WASM core for now, so the template's rust-gates, rust-proofs
+  # (Kani) and rust-supply-chain jobs are deleted rather than left skipping (ADR-1004). If a Rust
+  # core arrives (ADR-1015), copy them back from the template with its harness guard.
 
   # ── TypeScript ──────────────────────────────────────────────────────────────
   ts-gates:
@@ -102,6 +56,7 @@ jobs:
     needs: detect
     if: needs.detect.outputs.ts == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15 # ADR-1005
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -109,7 +64,7 @@ jobs:
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version: 22
+          node-version: 24 # ADR-1013
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
@@ -125,6 +80,7 @@ jobs:
     needs: detect
     if: needs.detect.outputs.ts == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15 # ADR-1005
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -132,7 +88,7 @@ jobs:
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version: 22
+          node-version: 24 # ADR-1013
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: known-vulnerability audit
@@ -156,6 +112,7 @@ jobs:
     needs: detect
     if: needs.detect.outputs.ts == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15 # ADR-1005
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -163,7 +120,7 @@ jobs:
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version: 22
+          node-version: 24 # ADR-1013
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # An explicit, version-pinned download from Playwright's CDN — nothing is fetched at install
@@ -185,6 +142,7 @@ jobs:
     name: SBOM
     needs: detect
     runs-on: ubuntu-latest
+    timeout-minutes: 15 # ADR-1005
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -254,7 +212,37 @@ jobs:
     # A reusable workflow, and `uses:` resolves a ref in that repo the same way an
     # action does — so ADR-0018 applies here too and it is pinned to a SHA, with
     # the version in the trailing comment. Bump deliberately.
+    # No timeout-minutes here (ADR-1005's one exception): GitHub rejects it on a job that calls a
+    # reusable workflow; the called workflow's own jobs carry their limits.
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+
+  # Runs on every project, with or without a manifest: a secret can be committed to any repo.
+  # Not a marketplace action: gitleaks-action needs a paid license on organisation accounts, and
+  # an action is one more mutable dependency. Instead the release binary is fetched at a pinned
+  # version and verified against a pinned SHA-256 before it runs. Bump both together
+  # (the checksum is on the release page, in gitleaks_<version>_checksums.txt).
+  secret-scan:
+    name: secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15 # ADR-1005
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0 # scan the whole history, not just the tip
+          persist-credentials: false
+      - name: install gitleaks (pinned, checksum-verified)
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb # linux_x64 tarball
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -fsSL -o gitleaks.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum -c -
+          tar xzf gitleaks.tgz gitleaks
+      # --redact keeps a real finding's value out of the (possibly public) build log.
+      - name: scan history
+        run: '"$RUNNER_TEMP/gitleaks" git --no-banner --redact --verbose .'
 
   deploy:
     name: deploy to Pages
@@ -264,7 +252,7 @@ jobs:
     # skips itself only when there is no dependency manifest at all, which cannot
     # be true of a project deploying a built site.) `e2e` is in here per ADR-0027:
     # a site whose pages are broken in a browser must not publish either.
-    needs: [ts-gates, ts-supply-chain, osv-scan, e2e]
+    needs: [ts-gates, ts-supply-chain, osv-scan, e2e, secret-scan]
     # Opt in per project: Settings → Variables → DEPLOY_PAGES = true.
     # Remember `base` must match the repo name or every asset 404s.
     if: vars.DEPLOY_PAGES == 'true' && github.ref == 'refs/heads/main'
@@ -275,6 +263,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15 # ADR-1005
     steps:
       - id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
