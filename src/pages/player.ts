@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────
 import { normalizeConfig } from "../core/config.ts";
 import type { EndScreen, ShowConfig, ShowNode } from "../core/config.ts";
+import { menuSections } from "../core/menu.ts";
 import { segmentEndAction } from "../core/routing.ts";
 import { escapeHtml } from "../core/text.ts";
 import { getTransfer } from "../shell/drafts.ts";
@@ -324,6 +325,7 @@ function onSegmentEnded(): void {
       if (ctx) navigateTo(ctx.nodeId, ctx.currentTime);
       return;
     }
+    case "auto-advance": // One default choice: a clean cut, no button or countdown (ADR-0031)
     case "return-to": // Aside with returnTo: auto-route back to the main line
     case "continue": // No way forward: play on into the next node (ADR-0022)
       navigateTo(action.nodeId);
@@ -497,31 +499,41 @@ function buildMenuList(): void {
   // Update index link label from config title if available
   if (config.title) $menuIndexLink.textContent = "← " + config.title + " — All shows";
 
-  for (const node of config.nodes) {
-    const item = document.createElement("button");
-    item.className = "menu-item" + (currentNode?.id === node.id ? " current" : "");
-
-    const title = document.createElement("span");
-    title.className = "menu-item-title";
-    title.textContent = node.title || node.id;
-    item.appendChild(title);
-
-    if (node.isAside) {
-      const badge = document.createElement("span");
-      badge.className = "menu-item-badge";
-      badge.textContent = node.defaultAside ? "Aside" : "Deep dive";
-      item.appendChild(badge);
+  for (const section of menuSections(config.nodes)) {
+    if (section.heading) {
+      const heading = document.createElement("li");
+      heading.className = "menu-section";
+      heading.textContent = section.heading;
+      $menuList.appendChild(heading);
     }
-
-    item.onclick = () => {
-      closeMenu();
-      navigateTo(node.id);
-    };
-
-    const li = document.createElement("li");
-    li.appendChild(item);
-    $menuList.appendChild(li);
+    for (const node of section.nodes) appendMenuItem(node);
   }
+}
+
+function appendMenuItem(node: ShowNode): void {
+  const item = document.createElement("button");
+  item.className = "menu-item" + (currentNode?.id === node.id ? " current" : "");
+
+  const title = document.createElement("span");
+  title.className = "menu-item-title";
+  title.textContent = node.title || node.id;
+  item.appendChild(title);
+
+  if (node.isAside) {
+    const badge = document.createElement("span");
+    badge.className = "menu-item-badge";
+    badge.textContent = node.defaultAside ? "Aside" : "Deep dive";
+    item.appendChild(badge);
+  }
+
+  item.onclick = () => {
+    closeMenu();
+    navigateTo(node.id);
+  };
+
+  const li = document.createElement("li");
+  li.appendChild(item);
+  $menuList.appendChild(li);
 }
 
 $menuToggle.addEventListener("click", openMenu);

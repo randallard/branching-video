@@ -2,8 +2,9 @@
  * What happens when a segment finishes playing — the player's routing rule, pure so it can be
  * property-tested and shared with the validator's reachability check.
  *
- * Precedence (ADR-0022 added the `continue` step):
+ * Precedence (ADR-0022 added the `continue` step, ADR-0031 the `auto-advance` one):
  *   1. choices already showing mid-segment → the countdown owns the next step (player-side);
+ *   1a. exactly one choice, and it's the default → go straight to its target, no choice UI;
  *   2. no choices + `returnAtCurrentTime` + a captured branch point → resume there;
  *   3. no choices + aside with `returnTo` → go there;
  *   4. no choices + `endScreen` → show it;
@@ -14,6 +15,7 @@
 import type { EndScreen, ShowConfig, ShowNode } from "./config.ts";
 
 export type SegmentEnd =
+  | { kind: "auto-advance"; nodeId: string }
   | { kind: "resume-branch" }
   | { kind: "return-to"; nodeId: string }
   | { kind: "end-screen"; endScreen: EndScreen }
@@ -44,15 +46,55 @@ export function continuesToNext(s: RouteShape): boolean {
   return !s.hasChoices && !(s.isAside && s.returnTo) && !s.hasEndScreen;
 }
 
+/** The target a node advances to without showing its choices: set exactly when the node has one
+ * choice and it is the default, which as a button is only "skip the countdown" (ADR-0031). */
+export function autoAdvanceTarget(node: ShowNode): string | undefined {
+  const [only, ...rest] = node.choices;
+  return only?.default === true && rest.length === 0 ? only.target : undefined;
+}
+
 export function segmentEndAction(
   config: ShowConfig,
   node: ShowNode,
   hasBranchPoint: boolean
 ): SegmentEnd {
+  const auto = autoAdvanceTarget(node);
+  if (auto !== undefined) return { kind: "auto-advance", nodeId: auto };
   if (node.choices.length > 0) return { kind: "choices" };
   if (node.returnAtCurrentTime && hasBranchPoint) return { kind: "resume-branch" };
   if (node.isAside && node.returnTo) return { kind: "return-to", nodeId: node.returnTo };
   if (node.endScreen) return { kind: "end-screen", endScreen: node.endScreen };
   const next = config.nodes[config.nodes.indexOf(node) + 1];
   return next ? { kind: "continue", nodeId: next.id } : { kind: "wrap" };
+}
+
+/** A node that plays straight into another which starts inside its range on the same video, so
+ * the viewer sees `replay` seconds twice. */
+export interface PlayOnOverlap {
+  from: string;
+  fromEnd: number;
+  to: string;
+  toStart: number;
+  replay: number;
+}
+
+/** Every unconditional segment-end hop — `continue` (ADR-0022) or `auto-advance` (ADR-0031) —
+ * whose target starts inside the source's range on the same video. A jump to elsewhere in the
+ * video, before the source's start, is not an overlap. */
+export function playOnOverlaps(config: ShowConfig): PlayOnOverlap[] {
+  const byId = new Map(config.nodes.map((n) => [n.id, n]));
+  const out: PlayOnOverlap[] = [];
+  for (const a of config.nodes) {
+    if (a.end === undefined) continue;
+    const action = segmentEndAction(config, a, false);
+    if (action.kind !== "continue" && action.kind !== "auto-advance") continue;
+    const b = byId.get(action.nodeId);
+    if (!b || (a.videoId ?? config.masterVideoId) !== (b.videoId ?? config.masterVideoId)) continue;
+    const aStart = a.start ?? 0;
+    const bStart = b.start ?? 0;
+    if (aStart <= bStart && bStart < a.end) {
+      out.push({ from: a.id, fromEnd: a.end, to: b.id, toStart: bStart, replay: a.end - bStart });
+    }
+  }
+  return out;
 }

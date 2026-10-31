@@ -3,6 +3,8 @@ import { isLegacyBackup, normalizeConfig } from "../core/config.ts";
 import type { Choice, ShowConfig, ShowNode } from "../core/config.ts";
 import { serialize, toFileText } from "../core/serialize.ts";
 import { parseShowHash } from "../core/handoff.ts";
+import { playOnOverlaps } from "../core/routing.ts";
+import type { PlayOnOverlap } from "../core/routing.ts";
 import { escapeHtml, extractVideoId, fmtTime, slugify, uniqueId } from "../core/text.ts";
 import { setTransfer } from "../shell/drafts.ts";
 import { adoptExternalConfig, DraftSession, guardAgainstUnload } from "../shell/draft-session.ts";
@@ -326,6 +328,8 @@ function renderTable(): void {
   const cfg = config;
   const tbody = byId("nodeTableBody");
   tbody.innerHTML = "";
+  // A node starting inside the one that plays into it: that stretch plays twice.
+  const overlapInto = new Map(playOnOverlaps(cfg).map((o) => [o.to, o]));
   for (const n of cfg.nodes) {
     const unresolved = n.choices.filter((c) => c.target && !cfg.nodes.some((x) => x.id === c.target)).length;
     const tr = document.createElement("tr");
@@ -337,7 +341,7 @@ function renderTable(): void {
     tr.innerHTML =
       `<td class="td-id">${escapeHtml(n.id)}</td>` +
       `<td>${escapeHtml(n.title || "")}</td>` +
-      `<td class="td-time">${fmtTime(n.start)}</td>` +
+      `<td class="td-time">${fmtTime(n.start)}${overlapWarning(overlapInto.get(n.id))}</td>` +
       `<td class="td-time">${fmtTime(n.end)}</td>` +
       `<td class="td-choices">${choicesCell}</td>` +
       `<td><button class="icon" data-seek="${String(n.start)}">⏩</button></td>`;
@@ -355,6 +359,12 @@ function renderTable(): void {
     });
     tbody.appendChild(tr);
   }
+}
+
+function overlapWarning(o: PlayOnOverlap | undefined): string {
+  if (!o) return "";
+  const title = `Starts before "${o.from}" ends (${fmtTime(o.fromEnd)}): ${o.replay.toFixed(1)} s plays twice`;
+  return ` <span class="unresolved" title="${escapeHtml(title)}">⚠</span>`;
 }
 
 // ── Sidebar (node form) ───────────────────────────────────────────────────────

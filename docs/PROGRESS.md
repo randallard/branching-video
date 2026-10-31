@@ -4,11 +4,16 @@ _Last updated: 2026-10-31_
 
 ## Status / next
 
+**2026-10-31 (later) — the unscheduled backlog, built** on branch `backlog-unscheduled`: a favicon (`8b652b4`), a lone default choice advances without choice UI ([ADR-0031](adr/0031-a-lone-default-choice-advances-without-choice-ui.md), `fe60967`), overlapping node times warned in the validator and Studio (`a52e2ff`), and the chapter menu grouped into main chapters and deep dives (`c19df34`). Mermaid chapter maps dropped (Ryan). 145 unit, 72 e2e. **Next:** merge that PR, check Big Buck Bunny's now-seamless `intro`/`chapter-2` cuts and the grouped menu live, then the five manual checks. See [journal](journal/2026-10-31-2-unscheduled-backlog.md).
+
 **2026-10-31 — the PR backlog is cleared.** #20 (advisories, ADR-0030) and #21 (ADR-0029 handoffs by show id) are merged, in that order, plus Renovate #8–#11, #15, #23. #20 needed 11 more advisories cleared first; glob and minimatch are overridden across a major (the one deliberate exception, explained in `pnpm-workspace.yaml`). This PR adds `rolldownOptions` (unblocks #16) and stops Renovate pinning override and engine ranges (#2). **Still open:** #16 (merge once rebased), #2 (re-check that it shrinks to the `node-version` pin), #6/#7 (one-day age gate only). Then the five manual checks (item 3 under **Next**) and the tooling-trial items in the Worklist. See [journal](journal/2026-10-31-backlog-cleared.md).
 
 **2026-10-14 — advisory fix in PR #20 (`8e7d774`).** Open Renovate PRs were red from advisories on `main` itself; overrides added. Also [ADR-0030](adr/0030-one-day-age-gate.md): age gate 14 days → 1 day, so no ignore is needed. See [journal](journal/2026-10-14-2-age-gate-moves-to-one-day.md).
 
-**Status:** Mid-migration onto `cr-ci-cd-rust-typescript-template`
+**Status (as of 2026-10-31):** the migration is complete: slices 1–4, the cutover and the
+supply-chain audit are all done (Worklist 1–6). The paragraphs below were written during it.
+
+**Status (2026-09):** Mid-migration onto `cr-ci-cd-rust-typescript-template`
 ([ADR-0003](adr/0003-retrofit-cr-ci-cd-template-onto-existing-repo.md)). **Slices 1 and 2 are on
 `main` and live** (2026-09-14): https://randallard.github.io/branching-video/ is now deployed by
 CI from the Vite build (ADR-0006 cutover done — `DEPLOY_PAGES=true`, Pages source = GitHub
@@ -385,17 +390,17 @@ Found in slice 2, not yet scheduled:
   patch: slice 3b.3's draft-first autosave means an edit is persisted moments after it's made
   (matching Studio, which never had this guard), so `dirty`/`beforeunload`/`confirmDiscard` were
   deleted rather than fixed.
-- No favicon (404 on every page). The e2e harness ignores exactly this one console error; drop
-  that exception in `e2e/support/app.ts` when a favicon lands.
+- ~~No favicon (404 on every page).~~ Done 2026-10-31 (`8b652b4`); the e2e exception is gone.
 
 Carried over, not yet scheduled (from `notes.txt`):
-- Single-choice default nodes should auto-advance with no choice UI or 8s countdown (scoped
-  as ~3 lines in `onSegmentEnded`). Every node in the ukulele show has no choices, so this
-  decides how that show plays. Do it in slice 3's routing core rather than in the old JS.
-- Chapter menu split into "Main chapters" / "Deep dives" if cluttered on mobile.
-- Mermaid chapter maps (maybe).
-- Studio doesn't catch overlapping node times (the ukulele file has `major-scale` start 399.2
-  before the previous node's end 399.4) — a candidate validator warning.
+- ~~Single-choice default nodes should auto-advance with no choice UI or 8s countdown.~~ Done
+  2026-10-31 as [ADR-0031](adr/0031-a-lone-default-choice-advances-without-choice-ui.md)
+  (`fe60967`). (The ukulele show it was first raised for was already covered by ADR-0022.)
+- ~~Chapter menu split into "Main chapters" / "Deep dives".~~ Done 2026-10-31 (`c19df34`).
+- ~~Mermaid chapter maps (maybe).~~ Dropped 2026-10-31 (Ryan): a large dependency that would
+  have to be bundled under the CSP, for a feature with no spec.
+- ~~Studio doesn't catch overlapping node times.~~ Done 2026-10-31 (`a52e2ff`): validator
+  warning plus a ⚠ on the start time in Studio.
 
 Tooling trial, not yet scheduled (from `work/typescript-review`, proposal T2, 2026-10-20):
 - **Trial oxlint + tsgolint v7 as the type-aware lint gate.** typescript-eslint caps
