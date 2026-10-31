@@ -170,20 +170,24 @@ test("an end screen shows its heading, body and links, and an internal link navi
   await expect(end).toBeHidden();
 });
 
-test("the chapter menu lists every node, marks asides, and navigates", async ({ app: { page } }) => {
+test("the chapter menu groups main chapters and deep dives, marks asides, and navigates", async ({
+  app: { page },
+}) => {
   await play(page, "branching.json");
   await expect(nodeTitle(page)).toHaveText("Intro");
   await page.locator("#menu-toggle").click();
   const menu = page.locator("#menu");
   await expect(menu).toHaveAttribute("aria-hidden", "false");
   const items = page.locator("#menu-list .menu-item");
+  await expect(page.locator("#menu-list .menu-section")).toHaveText(["Main chapters", "Deep dives"]);
+  // Config order within each group; the two asides move under their own heading.
   await expect(items.locator(".menu-item-title")).toHaveText([
     "Intro",
     "Left path",
-    "The dive",
     "Right path",
-    "Extra",
     "Finale",
+    "The dive",
+    "Extra",
   ]);
   await expect(items.filter({ hasText: "The dive" }).locator(".menu-item-badge")).toHaveText("Deep dive");
   await expect(items.filter({ hasText: "Extra" }).locator(".menu-item-badge")).toHaveText("Aside");
@@ -196,6 +200,13 @@ test("the chapter menu lists every node, marks asides, and navigates", async ({ 
   await page.locator("#menu-toggle").click();
   await page.keyboard.press("Escape");
   await expect(menu).toHaveAttribute("aria-hidden", "true");
+});
+
+test("a show with no asides keeps a flat chapter menu", async ({ app: { page } }) => {
+  await play(page, "ukulele.json");
+  await page.locator("#menu-toggle").click();
+  await expect(page.locator("#menu-list .menu-item")).toHaveCount(11);
+  await expect(page.locator("#menu-list .menu-section")).toHaveCount(0);
 });
 
 test("browser back returns to the previous node", async ({ app: { page } }) => {
