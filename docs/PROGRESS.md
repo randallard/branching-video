@@ -1,10 +1,12 @@
 # Progress & Status
 
-_Last updated: 2026-10-14_
+_Last updated: 2026-10-31_
 
 ## Status / next
 
-**2026-10-14 — advisory fix in PR #20 (`8e7d774`).** Open Renovate PRs were red from advisories on `main` itself; overrides added. Also [ADR-0030](adr/0030-one-day-age-gate.md): age gate 14 days → 1 day, so no ignore is needed. Merge #20 first, then #21 (ADR-0029), then Renovate. See [journal](journal/2026-10-14-2-age-gate-moves-to-one-day.md).
+**2026-10-31 — the PR backlog is cleared.** #20 (advisories, ADR-0030) and #21 (ADR-0029 handoffs by show id) are merged, in that order, plus Renovate #8–#11, #15, #23. #20 needed 11 more advisories cleared first; glob and minimatch are overridden across a major (the one deliberate exception, explained in `pnpm-workspace.yaml`). This PR adds `rolldownOptions` (unblocks #16) and stops Renovate pinning override and engine ranges (#2). **Still open:** #16 (merge once rebased), #2 (re-check that it shrinks to the `node-version` pin), #6/#7 (one-day age gate only). Then the five manual checks (item 3 under **Next**) and the tooling-trial items in the Worklist. See [journal](journal/2026-10-31-backlog-cleared.md).
+
+**2026-10-14 — advisory fix in PR #20 (`8e7d774`).** Open Renovate PRs were red from advisories on `main` itself; overrides added. Also [ADR-0030](adr/0030-one-day-age-gate.md): age gate 14 days → 1 day, so no ignore is needed. See [journal](journal/2026-10-14-2-age-gate-moves-to-one-day.md).
 
 **Status:** Mid-migration onto `cr-ci-cd-rust-typescript-template`
 ([ADR-0003](adr/0003-retrofit-cr-ci-cd-template-onto-existing-repo.md)). **Slices 1 and 2 are on
@@ -187,9 +189,9 @@ copy**. That happens on `main` too; it's item 1 below. See
 [journal 2026-09-26](journal/2026-09-26-backstop-browser-check-and-transfer-revert.md).
 
 **Next:**
-0. **Merge PR #18** (`editor-unload-backstop`). Still unrun by hand: manual step 4 (a stale
-   hide-time copy doesn't win, which needs a real tab switch) and step 5 (Studio).
-1. **The `#transfer` handoff can revert edits.** "Open in Studio"/"Open in Editor" import the
+0. ~~**Merge PR #18**~~ merged 2026-09-26. (Manual steps 4 and 5 were never recorded as run.)
+1. ~~**The `#transfer` handoff can revert edits.**~~ **Merged 2026-10-31 as PR #21**, after
+   Ryan's local check. "Open in Studio"/"Open in Editor" import the
    whole config as a snapshot. A stale sending tab plus "OK, update" overwrites newer fields, and
    "Cancel" makes a same-titled duplicate. **Decided in
    [ADR-0029](adr/0029-same-device-handoffs-carry-the-show-id-not-the-config.md) (accepted
@@ -200,7 +202,7 @@ copy**. That happens on `main` too; it's item 1 below. See
    take-after-read race in `openDraftStore()`. See
    [journal 2026-09-26 (2)](journal/2026-09-26-2-handoffs-by-show-id.md). Then commit, and open
    a PR stacked on #18 (or rebase onto `main` once #18 merges).
-2. **Re-run #15** once this fix is on `main`. `main` requires branches to be up to date, so
+2. ~~**Re-run #15**~~ merged 2026-10-31. Was: re-run #15 once this fix is on `main`. `main` requires branches to be up to date, so
    Renovate will rebase #15 itself (or tick its rebase box), and CI re-runs then.
 3. **The five manual checks** in [`e2e/README.md`](../e2e/README.md#what-stays-manual): real
    YouTube playback feel, Studio against a real video, a real phone, the native Save As dialog,
@@ -394,6 +396,25 @@ Carried over, not yet scheduled (from `notes.txt`):
 - Mermaid chapter maps (maybe).
 - Studio doesn't catch overlapping node times (the ukulele file has `major-scale` start 399.2
   before the previous node's end 399.4) — a candidate validator warning.
+
+Tooling trial, not yet scheduled (from `work/typescript-review`, proposal T2, 2026-10-20):
+- **Trial oxlint + tsgolint v7 as the type-aware lint gate.** typescript-eslint caps
+  `typescript <6.1` until it ships against TS 7.1's new API (7.1 beta 2026-10-20, final ~Dec),
+  so this repo stays on TS 6.0.3 for now (the template is getting an ADR for that pin, T1).
+  tsgolint is built on the TS 7 compiler and covers 59 of typescript-eslint's 61 type-aware
+  rules. The trial: run `oxlint --type-aware` (with `oxlint-tsgolint@7`) beside the current
+  `pnpm lint`; check that the two missing rules aren't ones we rely on (our gate needs
+  `strictTypeChecked` plus `no-non-null-assertion`, `switch-exhaustiveness-check` and
+  `no-floating-promises` as errors); compare the findings. Change nothing in CI yet. Record the
+  result here and in `work/typescript-review`. A pass is one of T1's two exit triggers.
+- **Discuss: adopt Engineering-Strategy's opt-in TS extras here?** (T3, 2026-10-20). This repo
+  already meets the template's lifted bar. The open question is the two opt-ins every new project
+  will now be offered: an **`any` registry** (each `any`/`as` justified inline and listed in
+  `docs/any-registry.md`) and **jsx-a11y**-style accessibility lint (a vanilla-DOM app, so it
+  would be axe/Playwright checks rather than a JSX plugin). Record the answer as an ADR either
+  way.
+- **Node 22 → 24** (T4, accepted): `node-version` in `ci.yml` and the `engines` floor. Node 22
+  goes EOL 2027-04-30.
 
 ## Open questions
 

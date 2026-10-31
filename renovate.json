@@ -5,5 +5,12 @@
   "rangeStrategy": "pin",
   "lockFileMaintenance": {
     "enabled": true
-  }
+  },
+  "packageRules": [
+    {
+      "description": "ADR-0013 pins dependencies, not these. Override ranges in pnpm-workspace.yaml are deliberate (a floor that clears an advisory, bounded below the next major); the lockfile already fixes what installs. Engines are a support floor; pinning them to the latest release fails install (ERR_PNPM_UNSUPPORTED_ENGINE, PR #2). Both are changed by hand.",
+      "matchDepTypes": ["pnpm-workspace.overrides", "engines"],
+      "enabled": false
+    }
+  ]
 }
