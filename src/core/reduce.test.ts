@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
-import type { ShowEvent } from "./events.ts";
+import type { ShowEvent, ShowField } from "./events.ts";
 import { findShow, reduce, snapshotNodeKeys, toConfig } from "./reduce.ts";
 import { arbitraryConfig, arbitraryEvents } from "./arbitraries.test-util.ts";
 
@@ -55,6 +55,8 @@ describe("reduce", () => {
   });
 
   it("counts unknown kinds and skips them instead of failing", () => {
+    // cast (any-registry): a deliberately unknown event kind, which no ShowEvent type admits; the
+    // test is that the reducer counts and skips it.
     const events = [
       { id: "a", at: AT, v: 1, kind: "show-field-set", showId: "s", field: "title", value: "Hi" },
       { id: "b", at: AT, v: 1, kind: "show-invented-later", showId: "s" },
@@ -130,8 +132,8 @@ describe("reduce", () => {
   });
 
   describe("last writer wins per field (ADR-0008)", () => {
-    const set = (id: string, at: string, field: string, value: unknown): ShowEvent =>
-      ({ id, at, v: 1, kind: "show-field-set", showId: "s", field, value }) as ShowEvent;
+    const set = (id: string, at: string, field: ShowField, value: unknown): ShowEvent =>
+      ({ id, at, v: 1, kind: "show-field-set", showId: "s", field, value }) satisfies ShowEvent;
 
     it("resolves the same field to the later write", () => {
       const state = reduce([
@@ -182,7 +184,7 @@ describe("reduce", () => {
           field: "title",
           value: "Resurrected",
         },
-      ] as ShowEvent[];
+      ] satisfies ShowEvent[];
       expect(findShow(reduce(events), "s")?.nodes).toEqual([]);
     });
 
@@ -215,7 +217,7 @@ describe("reduce", () => {
           field: "title",
           value: "And editable",
         },
-      ] as ShowEvent[];
+      ] satisfies ShowEvent[];
       const nodes = findShow(reduce(events), "s")?.nodes;
       expect(nodes).toHaveLength(1);
       // Edits after the re-add apply again — the removal is fully lifted, not just paused.
@@ -233,7 +235,7 @@ describe("reduce", () => {
           order: "V",
         },
         { ...base("rm", "2026-09-02T00:00:00.000Z"), kind: "node-removed", showId: "s", nodeKey: "k" },
-      ] as ShowEvent[];
+      ] satisfies ShowEvent[];
       expect(findShow(reduce(events), "other")?.nodes).toHaveLength(1);
     });
 
@@ -242,7 +244,7 @@ describe("reduce", () => {
       const events = [
         { ...base("rm", "2026-09-01T00:00:00.000Z"), kind: "node-removed", showId: "s", nodeKey: "n:intro" },
         { ...base("snap", "2026-09-02T00:00:00.000Z"), kind: "show-snapshot", showId: "s", config },
-      ] as ShowEvent[];
+      ] satisfies ShowEvent[];
       expect(findShow(reduce(events), "s")?.nodes).toHaveLength(1);
     });
 
@@ -265,7 +267,7 @@ describe("reduce", () => {
           field: "title",
           value: "Edited on the phone",
         },
-      ] as ShowEvent[];
+      ] satisfies ShowEvent[];
       const state = reduce(events);
       expect(state.collisions).toHaveLength(1);
       const c = state.collisions[0];
@@ -295,7 +297,7 @@ describe("reduce", () => {
           value: "Still here",
         },
         { ...base("rm", "2026-09-03T00:00:00.000Z"), kind: "node-removed", showId: "s", nodeKey: "k" },
-      ] as ShowEvent[];
+      ] satisfies ShowEvent[];
       expect(reduce(events).collisions).toEqual([]);
     });
 
@@ -319,7 +321,7 @@ describe("reduce", () => {
           node: { id: "intro", title: "Brought back", choices: [] },
           order: "V",
         },
-      ] as ShowEvent[];
+      ] satisfies ShowEvent[];
       expect(reduce(events).collisions).toEqual([]);
     });
 
@@ -335,13 +337,13 @@ describe("reduce", () => {
           field: "title",
           value: "Edited after deletion",
         },
-      ] as ShowEvent[];
+      ] satisfies ShowEvent[];
       expect(reduce(events).collisions).toHaveLength(1);
 
       const answered = [
         ...events,
         { ...base("stay-gone", "2026-09-03T00:00:00.000Z"), kind: "node-removed", showId: "s", nodeKey: "k" },
-      ] as ShowEvent[];
+      ] satisfies ShowEvent[];
       expect(reduce(answered).collisions).toEqual([]);
       expect(findShow(reduce(answered), "s")?.nodes).toEqual([]);
     });
@@ -359,7 +361,7 @@ describe("reduce", () => {
           value: "Edited after deletion",
         },
         { ...base("snap", "2026-09-03T00:00:00.000Z"), kind: "show-snapshot", showId: "s", config },
-      ] as ShowEvent[];
+      ] satisfies ShowEvent[];
       expect(reduce(events).collisions).toEqual([]);
     });
 
@@ -367,7 +369,7 @@ describe("reduce", () => {
       const events = [
         { ...base("d", "2026-09-01T00:00:00.000Z"), kind: "show-deleted", showId: "s" },
         { ...base("r", "2026-09-02T00:00:00.000Z"), kind: "show-restored", showId: "s" },
-      ] as ShowEvent[];
+      ] satisfies ShowEvent[];
       expect(findShow(reduce(events), "s")?.deleted).toBe(false);
     });
   });

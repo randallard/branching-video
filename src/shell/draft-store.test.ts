@@ -59,6 +59,7 @@ describe("DraftStore", () => {
     const bundle = await s.exportBundle();
 
     const fresh = store();
+    // cast (any-registry): JSON.parse returns any; widening it to unknown claims nothing.
     const added = await fresh.importBundle(JSON.parse(bundle) as unknown);
     expect(added).toBeGreaterThan(0);
     expect(fresh.list().map((x) => x.title)).toEqual(["Exported"]);
@@ -68,6 +69,7 @@ describe("DraftStore", () => {
   it("importing the same bundle twice adds nothing the second time", async () => {
     const s = store();
     await s.create(config("Once"));
+    // cast (any-registry): JSON.parse returns any; widening it to unknown claims nothing.
     const bundle = JSON.parse(await s.exportBundle()) as unknown;
 
     const fresh = store();
@@ -80,6 +82,7 @@ describe("DraftStore", () => {
   it("merges another device's edits rather than choosing between them", async () => {
     const laptop = store();
     const id = await laptop.create(config("Shared"));
+    // cast (any-registry): JSON.parse returns any; widening it to unknown claims nothing.
     const shared = JSON.parse(await laptop.exportBundle()) as unknown;
 
     const phone = store();
@@ -94,6 +97,7 @@ describe("DraftStore", () => {
     onPhone.config.nodes[0]!.start = 42;
     await phone.save(onPhone);
 
+    // cast (any-registry): JSON.parse returns any; widening it to unknown claims nothing.
     await laptop.importBundle(JSON.parse(await phone.exportBundle()) as unknown);
     const merged = laptop.config(id);
     expect(merged?.nodes[0]?.title).toBe("Titled on the laptop");

@@ -9,8 +9,8 @@
  * Per-field last-writer-wins (ADR-0008) falls out of folding in total order: each `*-field-set`
  * touches one field, so independent edits to different fields both survive.
  */
-import type { Choice, JsonRecord, ShowConfig, ShowNode } from "./config.ts";
-import { normalizeNode } from "./config.ts";
+import type { Choice, ShowConfig, ShowNode } from "./config.ts";
+import { isRecord, normalizeNode } from "./config.ts";
 import type { NodeField, ShowEvent, ShowField } from "./events.ts";
 import { compareEvents } from "./events.ts";
 import { orderKeys } from "./order.ts";
@@ -141,7 +141,7 @@ function emptyShow(showId: string): Working {
 /** Deep-copy a node through the lenient normalizer, so state never aliases an event's payload
  * and a hand-written snapshot gets the same treatment as a loaded file. */
 function cloneNode(node: unknown): ShowNode {
-  return normalizeNode((node ?? {}) as JsonRecord);
+  return normalizeNode(isRecord(node) ? node : {});
 }
 
 function cloneChoices(choices: unknown): Choice[] {
@@ -407,6 +407,9 @@ export function reduce(events: readonly ShowEvent[], record?: FieldRecorder): Sh
         show.deleted = false;
         break;
       default:
+        // cast (any-registry): statically unreachable (every known kind is handled, so `e` is never
+        // here); at runtime it's an event from a newer build, whose `kind` isShowEvent checked is a
+        // string.
         unknownKinds.add((e as { kind: string }).kind);
         break;
     }

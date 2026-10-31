@@ -9,6 +9,8 @@ function reverseKeys(value: unknown): unknown {
   if (typeof value === "object" && value !== null) {
     const out: Record<string, unknown> = {};
     for (const k of Object.keys(value).reverse()) {
+      // cast (any-registry): guarded just above (an object, not null); only its own keys, from
+      // Object.keys, are read.
       out[k] = reverseKeys((value as Record<string, unknown>)[k]);
     }
     return out;

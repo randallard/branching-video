@@ -115,6 +115,8 @@ Copy [`TEMPLATE.md`](TEMPLATE.md).
 | [0029](0029-same-device-handoffs-carry-the-show-id-not-the-config.md) | Handoffs between pages on the same device carry the show id, not the config | Accepted |
 | [0030](0030-one-day-age-gate.md) | The age gate is one day, not fourteen | Accepted |
 | [0031](0031-a-lone-default-choice-advances-without-choice-ui.md) | A node whose only choice is the default advances to it without showing choices | Accepted |
+| [0032](0032-every-cast-is-registered.md) | Every `any` and type assertion is registered, with its reason, and CI checks it | Accepted |
+| [0033](0033-accessibility-checks-with-axe.md) | Accessibility is checked with axe against every page in CI | Accepted |
 | [1000](1000-template-standards-adrs-are-inherited.md) | Template standards ADRs are inherited, numbered 1000 and up | Accepted |
 | [1001](1001-project-conventions-is-the-canonical-standard.md) | project-conventions is the canonical provable-code standard | Accepted |
 | [1002](1002-provable-is-a-four-rung-ladder.md) | "Provable" means a four-rung ladder, and a project claims only the rungs CI enforces | Accepted |

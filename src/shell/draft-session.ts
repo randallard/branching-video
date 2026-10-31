@@ -106,6 +106,8 @@ export class DraftSession {
     if (storage === null) return;
     const entries: BackstopEntry[] = [...this.unsaved.values()].map((u) => {
       const { showId, nodeKeys } = identify(u.slot);
+      // cast (any-registry): a JSON round-trip of a ShowConfig (plain JSON-shaped data) is a
+      // ShowConfig; it's a deep copy so the backstop doesn't alias live state.
       return { showId, nodeKeys: [...nodeKeys], config: JSON.parse(JSON.stringify(u.config)) as ShowConfig, at: u.at };
     });
     writeBackstop(storage, this.id, entries);
@@ -150,6 +152,8 @@ export class DraftSession {
 function identify(slot: Slot): { showId: string; nodeKeys: string[] } {
   slot.showId ??= newId();
   for (let i = 0; i < slot.nodeKeys.length; i++) slot.nodeKeys[i] ??= newId();
+  // cast (any-registry): the loop just above fills every undefined slot with newId(), so no element
+  // is undefined any more.
   return { showId: slot.showId, nodeKeys: slot.nodeKeys as string[] };
 }
 

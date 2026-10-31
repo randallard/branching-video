@@ -49,6 +49,8 @@ export function isEventBundle(raw: unknown): boolean {
   return (
     typeof raw === "object" &&
     raw !== null &&
+    // cast (any-registry): guarded on the lines above (an object, not null); only the `format` key
+    // is read and compared.
     (raw as Record<string, unknown>)["format"] === BUNDLE_FORMAT
   );
 }
@@ -65,6 +67,8 @@ export function parseBundle(raw: unknown): ShowEvent[] {
   if (typeof raw !== "object" || raw === null) {
     throw new Error("Not a Branching Video backup: expected a JSON object.");
   }
+  // cast (any-registry): guarded just above (an object, not null); each key is type-checked before
+  // it's trusted.
   const bundle = raw as Record<string, unknown>;
   if (bundle["format"] !== BUNDLE_FORMAT) {
     throw new Error(

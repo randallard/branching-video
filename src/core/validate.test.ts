@@ -50,6 +50,8 @@ describe("validate", () => {
     fc.assert(
       fc.property(fc.integer({ min: 1, max: 10 }), fc.string({ minLength: 1 }), (n, bad) => {
         fc.pre(!/^n\d+$/.test(bad));
+        // cast (any-registry): `chain` builds this exact shape (typed unknown because validate
+        // takes raw JSON); the test then writes one target into it.
         const cfg = chain(n) as { nodes: { choices: { target: string }[] }[] };
         cfg.nodes[0]!.choices = [{ target: bad }];
         const r = validate(cfg);
@@ -59,6 +61,8 @@ describe("validate", () => {
   });
 
   it("ignores underscore fields like the player does", () => {
+    // cast (any-registry): `chain` returns a plain object (typed unknown because validate takes raw
+    // JSON).
     const cfg = chain(2) as Record<string, unknown>;
     cfg["_notes"] = ["anything"];
     expect(validate(cfg).errors).toEqual([]);

@@ -41,11 +41,15 @@ function clip(text: string, max = 80): string {
 
 export function formatValue(field: FieldRef["field"], value: unknown): string {
   if (field === "choices" && Array.isArray(value)) {
+    // cast (any-registry): choices history values are recorded after the reducer's cloneChoices
+    // normalized them, and Array.isArray holds just above.
     const choices = value as Choice[];
     const list = choices.map((c) => `${c.label || "(no label)"} → ${c.target || "?"}`).join("; ");
     return clip(`${String(choices.length)} choice${choices.length === 1 ? "" : "s"}: ${list}`);
   }
   if (field === "endScreen" && typeof value === "object" && value !== null) {
+    // cast (any-registry): endScreen history values are recorded from the normalized node
+    // (reduce.ts), and the line above rules out non-objects and null.
     const es = value as EndScreen;
     const links = `${String(es.links.length)} link${es.links.length === 1 ? "" : "s"}`;
     return clip(`${es.heading ? `"${es.heading}"` : "(no heading)"}, ${links}`);

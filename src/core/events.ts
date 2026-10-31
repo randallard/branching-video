@@ -67,6 +67,8 @@ export function compareEvents(a: ShowEvent, b: ShowEvent): number {
  * understand, and an over-strict gate here would reject events written by a newer build. */
 export function isShowEvent(value: unknown): value is ShowEvent {
   if (typeof value !== "object" || value === null) return false;
+  // cast (any-registry): guarded just above (an object, not null); this is the type guard itself,
+  // and every field it returns true on is checked below.
   const e = value as Record<string, unknown>;
   return (
     typeof e["id"] === "string" &&

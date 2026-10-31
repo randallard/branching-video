@@ -1,9 +1,10 @@
 /** Typed DOM lookups. A missing element is a bug in the page's HTML, so it throws. */
 
-export function byId<T extends HTMLElement = HTMLElement>(
-  id: string,
-  ctor: new () => T = HTMLElement as unknown as new () => T
-): T {
+// Overloads, so the element type always comes from a constructor that is actually checked:
+// without one it's an HTMLElement, never a caller's unchecked guess.
+export function byId(id: string): HTMLElement;
+export function byId<T extends HTMLElement>(id: string, ctor: new () => T): T;
+export function byId(id: string, ctor: new () => HTMLElement = HTMLElement): HTMLElement {
   const e = document.getElementById(id);
   if (!(e instanceof ctor)) throw new Error(`#${id} is missing or not a ${ctor.name}`);
   return e;

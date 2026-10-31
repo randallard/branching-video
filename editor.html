@@ -15,7 +15,7 @@
     --text: #e6e9ef;
     --muted: #9aa4b2;
     --accent: #5b8def;
-    --accent-2: #3a6fd8;
+    --accent-2: #3464c2; --accent-hover: #4267ae; /* ≥4.5:1 behind light text (WCAG AA, ADR-0033); was #3a6fd8 at 3.88 */
     --danger: #e5534b;
     --danger-bg: #2a1718;
     --warn: #d9a441;
@@ -56,7 +56,7 @@
   }
   button:hover { border-color: #3c4456; background: #242a35; }
   button.primary { background: var(--accent-2); border-color: var(--accent); }
-  button.primary:hover { background: var(--accent); }
+  button.primary:hover { background: var(--accent-hover); }
   button.danger { color: #ffb4ae; border-color: #5a2d2c; background: var(--danger-bg); }
   button.icon { padding: 4px 8px; line-height: 1; }
   button:disabled { opacity: .45; cursor: not-allowed; }
@@ -108,7 +108,7 @@
 
   .field { margin-bottom: 12px; }
   .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
-  .field .hint { font-size: 11px; color: #6b7585; margin-top: 3px; }
+  .field .hint { font-size: 11px; color: #818a98; /* ≥4.5:1 on bg, panel and panel-2 (ADR-0033); was #6b7585 at 3.73 */ margin-top: 3px; }
   /* per-field history (ADR-0023) */
   .hist-badge { margin-left: 6px; padding: 0 6px; font-size: 11px; line-height: 16px; border-radius: 8px; color: var(--accent); text-transform: none; letter-spacing: 0; }
   .hist-panel { margin-top: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); padding: 6px 8px; }
@@ -297,7 +297,7 @@
       <span>Nodes</span>
       <button class="icon" id="addNodeBtn" title="Add node">+ Add</button>
     </div>
-    <div class="node-list" id="nodeList"></div>
+    <div class="node-list" id="nodeList" tabindex="0" aria-label="Nodes"></div>
   </aside>
 
   <section class="editor" id="editor"></section>
