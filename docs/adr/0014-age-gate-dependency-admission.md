@@ -1,5 +1,5 @@
 # ADR-0014: Age-gate new dependency releases at the package manager and the update bot
-- Status: Accepted
+- Status: Superseded by [ADR-0030](0030-one-day-age-gate.md)
 - Date: 2026-09-14
 - Deciders: Ryan
 
