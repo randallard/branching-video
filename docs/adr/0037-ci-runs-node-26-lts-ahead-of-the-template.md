@@ -1,5 +1,5 @@
 # ADR-0037: CI runs Node 26 LTS, ahead of the template; the engines floor stays 24
-- Status: Accepted
+- Status: Superseded by [ADR-1020](1020-ci-runs-the-active-lts-and-the-engines-floor-trails-it.md)
 - Date: 2026-11-01
 - Deciders: Ryan
 

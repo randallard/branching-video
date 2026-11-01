@@ -120,7 +120,7 @@ Copy [`TEMPLATE.md`](TEMPLATE.md).
 | [0034](0034-editor-and-studio-edit-a-working-copy-diffed-into-events.md) | The Editor and Studio edit a working copy that is diffed into events | Accepted |
 | [0035](0035-move-to-pnpm-12.md) | Move to pnpm 12, with the lockfile regenerated in its own change | Accepted |
 | [0036](0036-the-players-position-is-one-pure-reducer.md) | The player's position is one pure reducer | Accepted |
-| [0037](0037-ci-runs-node-26-lts-ahead-of-the-template.md) | CI runs Node 26 LTS, ahead of the template; the engines floor stays 24 | Accepted |
+| [0037](0037-ci-runs-node-26-lts-ahead-of-the-template.md) | CI runs Node 26 LTS, ahead of the template; the engines floor stays 24 | Superseded by [ADR-1020](1020-ci-runs-the-active-lts-and-the-engines-floor-trails-it.md) |
 | [0038](0038-a-blank-show-is-not-saved.md) | A blank show is not saved, and creating one is refused | Accepted |
 | [1000](1000-template-standards-adrs-are-inherited.md) | Template standards ADRs are inherited, numbered 1000 and up | Accepted |
 | [1001](1001-project-conventions-is-the-canonical-standard.md) | project-conventions is the canonical provable-code standard | Accepted |
@@ -135,10 +135,11 @@ Copy [`TEMPLATE.md`](TEMPLATE.md).
 | [1010](1010-typescript-stays-on-6-until-the-lint-gate-supports-7.md) | TypeScript stays on 6.x until the type-aware lint gate supports 7 | Accepted |
 | [1011](1011-typescript-strictness-bar.md) | The TypeScript strictness bar matches what the repos already run | Accepted |
 | [1012](1012-strictness-extras-offered-at-project-start.md) | Engineering-Strategy's TS extras are offered as an opt-in at every project start | Accepted |
-| [1013](1013-node-24-lts-in-ci.md) | CI runs Node 24 LTS | Accepted |
+| [1013](1013-node-24-lts-in-ci.md) | CI runs Node 24 LTS | Superseded by [ADR-1020](1020-ci-runs-the-active-lts-and-the-engines-floor-trails-it.md) |
 | [1014](1014-npm-trusted-publishing-hygiene.md) | npm trusted publishing: bind by repository ID, never from comment- or fork-triggered workflows | Accepted |
 | [1015](1015-logic-beyond-provable-lite-moves-to-a-rust-core.md) | UI logic that needs more than provable-lite moves into a Rust core compiled to WASM | Accepted |
 | [1016](1016-pnpm-supply-chain-settings-stay-explicit.md) | pnpm supply-chain settings stay explicit, and major pnpm bumps are evaluated first | Accepted |
 | [1017](1017-state-is-managed-facts-managed-position-derived-values.md) | State is managed facts, managed position and derived values, and a screen's transitions go through one pure, property-tested reducer | Accepted |
 | [1018](1018-osv-scanner-reads-the-whole-lockfile.md) | OSV-Scanner is at least v2.7.0, and a scan is read by its package count, not just its verdict | Accepted |
 | [1019](1019-http-apis-lint-against-a-vendored-api-standards-ruleset.md) | HTTP APIs are linted in CI against a vendored, pinned api-standards ruleset | Accepted |
+| [1020](1020-ci-runs-the-active-lts-and-the-engines-floor-trails-it.md) | CI runs the Active LTS (Node 26); the engines floor stays one LTS behind (24) | Accepted |
