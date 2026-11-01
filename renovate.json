@@ -21,6 +21,12 @@
       "description": "ADR-1020 (was ADR-0037 here): @types/node describes the engines floor (Node 24), not CI's Node 26, so a tool can't use a 26-only API by accident. Move with the floor.",
       "matchPackageNames": ["@types/node"],
       "allowedVersions": "24.x"
+    },
+    {
+      "description": "ADR-1020: CI's node-version is the LTS line (26), not a patch. setup-node resolves it to the latest 26.x on every run, which is how security patches arrive, so a pin would only freeze them (PR #2, closed). 'replace' still proposes the next major, which ADR-1020's next move is decided against.",
+      "matchManagers": ["github-actions"],
+      "matchDepNames": ["node"],
+      "rangeStrategy": "replace"
     }
   ]
 }
