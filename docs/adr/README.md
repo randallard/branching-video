@@ -117,6 +117,7 @@ Copy [`TEMPLATE.md`](TEMPLATE.md).
 | [0031](0031-a-lone-default-choice-advances-without-choice-ui.md) | A node whose only choice is the default advances to it without showing choices | Accepted |
 | [0032](0032-every-cast-is-registered.md) | Every `any` and type assertion is registered, with its reason, and CI checks it | Accepted |
 | [0033](0033-accessibility-checks-with-axe.md) | Accessibility is checked with axe against every page in CI | Accepted |
+| [0034](0034-editor-and-studio-edit-a-working-copy-diffed-into-events.md) | The Editor and Studio edit a working copy that is diffed into events | Accepted |
 | [1000](1000-template-standards-adrs-are-inherited.md) | Template standards ADRs are inherited, numbered 1000 and up | Accepted |
 | [1001](1001-project-conventions-is-the-canonical-standard.md) | project-conventions is the canonical provable-code standard | Accepted |
 | [1002](1002-provable-is-a-four-rung-ladder.md) | "Provable" means a four-rung ladder, and a project claims only the rungs CI enforces | Accepted |
