@@ -23,6 +23,12 @@ describe("DraftStore", () => {
     expect(s.open(id)?.nodeKeys.every((k) => k !== null)).toBe(true);
   });
 
+  it("refuses to create a blank show rather than hand back an id that isn't in the log (ADR-0038)", async () => {
+    const s = store();
+    await expect(s.create({ title: "", startNode: "", nodes: [] })).rejects.toThrow("ADR-0038");
+    expect(s.list()).toEqual([]);
+  });
+
   it("saves an edit and gives it back", async () => {
     const s = store();
     const id = await s.create(config("Before"));
