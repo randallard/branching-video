@@ -6,6 +6,8 @@ _Last updated: 2026-11-01_
 
 **Standards:** last compliance review 2026-11-01: compliant on the #40/#41/#44 stack tip apart from currency, 3 gaps (ADR-1019 and its skill text not inherited; no `.env.example`; Renovate #43 proposes TypeScript 7 against ADR-1010), all 3 fixed on `compliance-2026-11-01` ([note](compliance/2026-11-01.md))
 
+**2026-11-01 (6): ADR-1022 from the template, Node 26 as the floor** ([journal](journal/2026-11-01-6-adr-1022-node-26-floor.md)). `engines` `>=26.0.0`, `@types/node` 26.6.6. Local gates pass. On branch `adr-1022-node-26`. **Next:** read CI (its e2e is the first run on this), merge.
+
 **2026-11-01 (5) — Renovate stops pinning CI's `node-version`** on `renovate-node-version-range`: #2 (pin 26 → 26.13.0) closed; a rule gives the `github-actions` `node` dependency `rangeStrategy: "replace"`, so patches flow through `setup-node` and only a new major opens a PR. #49 (ADR-1020) is merged (`686122f`), and Renovate closed #36/#38/#39/#42/#45 itself. **Next:** merge; check no node pin reappears; Ryan's real-YouTube aside check and the five manual checks; stance review 2026-11-30. See [journal](journal/2026-11-01-5-renovate-stops-pinning-node-version.md).
 
 **2026-11-01 (4) — ADR-1020 from the template** on `adr-1020-node-26`: template ADR-1020 (Node 26 in CI, floor 24) supersedes ADR-1013 and this repo's [ADR-0037](adr/0037-ci-runs-node-26-lts-ahead-of-the-template.md); no code change. **Next:** merge; then the Renovate closures and Ryan's manual checks as in (3). See [journal](journal/2026-11-01-4-adr-1020-from-the-template.md).
