@@ -211,6 +211,8 @@ jobs:
       contents: read
       security-events: write
       actions: read
+    # v2.7.0 at least (ADR-1018, ADR-0035): pnpm 12 writes a two-document lockfile, and earlier
+    # versions read only the first (pnpm's own packages), so they pass while scanning none of ours.
     # A reusable workflow, and `uses:` resolves a ref in that repo the same way an
     # action does — so ADR-0018 applies here too and it is pinned to a SHA, with
     # the version in the trailing comment. Bump deliberately.

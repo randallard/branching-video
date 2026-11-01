@@ -4,7 +4,9 @@ _Last updated: 2026-10-31_
 
 ## Status / next
 
-**2026-10-31 (5) — the working copy, recorded** on branch `adr-working-copy`: [ADR-0034](adr/0034-editor-and-studio-edit-a-working-copy-diffed-into-events.md) records that the Editor and Studio edit a `WorkingShow` diffed into per-field events, the project's deviation from ADR-1017. Uncommitted, waiting on Ryan's check. **Next:** commit and PR it; then pnpm 12 (ADR first; mind ADR-1018); then the player reducer (ADR, then change). See [journal](journal/2026-10-31-5-working-copy-adr.md).
+**2026-10-31 (6) — pnpm 12** on branch `pnpm-12` (stacked on #40): [ADR-0035](adr/0035-move-to-pnpm-12.md) and the move to pnpm 12.17.0; lockfile gains only pnpm's own entries; every gate green locally (OSV v2.7.0 reads 309 packages). **Next:** merge #40 then this PR; then the player reducer (ADR, then change). See [journal](journal/2026-10-31-6-pnpm-12.md).
+
+**2026-10-31 (5) — the working copy, recorded** on branch `adr-working-copy` (PR #40): [ADR-0034](adr/0034-editor-and-studio-edit-a-working-copy-diffed-into-events.md) records that the Editor and Studio edit a `WorkingShow` diffed into per-field events, the project's deviation from ADR-1017. **Next:** commit and PR it; then pnpm 12 (ADR first; mind ADR-1018); then the player reducer (ADR, then change). See [journal](journal/2026-10-31-5-working-copy-adr.md).
 
 **2026-10-31 (1012/1017/review) — Ryan's three follow-ups** on `adopt-1012-extras`: (1) both ADR-1012 extras adopted: the cast registry (ADR-0032; 39 casts → 25, all justified, `pnpm casts` in CI) and axe on every page (ADR-0033; fixed button/hint/link contrast, unlabelled Editor and Studio fields, an unfocusable node list); (2) an ADR-1017 look, which found the player's position state is the case 1017 targets and the Editor/Studio working copy is an unrecorded exception; (3) the first [stance review](reviews/2026-10-31-stance-review.md). **Next, Ryan's call:** a player reducer (ADR + change); an ADR recording the Editor/Studio working copy; pnpm 12 (trialled, viable). T3 is answered. See [journal](journal/2026-10-31-4-1012-extras-1017-look-stance-review.md).
 
