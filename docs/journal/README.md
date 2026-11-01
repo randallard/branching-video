@@ -70,3 +70,4 @@ Terse and first-person is fine. This is a lab notebook, not a report.
 | [2026-10-31 (3)](2026-10-31-3-inherited-standards.md) | Inherited ADRs 1000–1018 and the current skills; CI conformed (timeouts, Node 24, secret scan, Rust jobs deleted, strictDepBuilds); 1012 extras and a 1017 look left for Ryan |
 | [2026-10-31 (4)](2026-10-31-4-1012-extras-1017-look-stance-review.md) | ADR-1012 extras adopted (cast registry 39 → 25; axe fixed contrast, labels, focus on three pages); ADR-1017 look (the player wants a reducer); first stance review |
 | [2026-10-31 (5)](2026-10-31-5-working-copy-adr.md) | ADR-0034 records the Editor/Studio working copy diffed into events, the deviation from ADR-1017; next pnpm 12, then the player reducer |
+| [2026-10-31 (6)](2026-10-31-6-pnpm-12.md) | ADR-0035 and the move to pnpm 12.17.0: lockfile adds only pnpm's own entries; every gate green locally, OSV reads 309 packages |
