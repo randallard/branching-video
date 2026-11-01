@@ -18,7 +18,7 @@
       "allowedVersions": "6.0.x"
     },
     {
-      "description": "ADR-0037: @types/node describes the engines floor (Node 24), not CI's Node 26, so a tool can't use a 26-only API by accident. Move with the floor.",
+      "description": "ADR-1020 (was ADR-0037 here): @types/node describes the engines floor (Node 24), not CI's Node 26, so a tool can't use a 26-only API by accident. Move with the floor.",
       "matchPackageNames": ["@types/node"],
       "allowedVersions": "24.x"
     }

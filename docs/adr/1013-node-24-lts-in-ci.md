@@ -1,5 +1,5 @@
 # ADR-1013: CI runs Node 24 LTS
-- Status: Accepted
+- Status: Superseded by [ADR-1020](1020-ci-runs-the-active-lts-and-the-engines-floor-trails-it.md)
 - Date: 2026-10-20
 - Deciders: Ryan
 
