@@ -4,6 +4,10 @@ _Last updated: 2026-10-31_
 
 ## Status / next
 
+**Standards:** last compliance review 2026-11-01: compliant on the #40/#41/#44 stack tip apart from currency, 3 gaps (ADR-1019 and its skill text not inherited; no `.env.example`; Renovate #43 proposes TypeScript 7 against ADR-1010) ([note](compliance/2026-11-01.md))
+
+**2026-11-01 — #40, #41, #44 merged** into `main`, in order (`cc49128`, `ddb659c`, `6da811e`); `main` CI green (run 41316237993). The stack's upper PRs had no CI until retargeted to `main` and closed/reopened (CI triggers on PRs into `main` only, and a base change isn't a trigger). OSV on #41 read 309 packages (ADR-1018). Also the first [compliance review](compliance/2026-11-01.md). **Next:** (1) the three compliance gaps, Ryan's call; (2) triage the open Renovate PRs: #43 TypeScript 7 (close, ADR-1010), #42 Node 26 (an ADR-1013 question), #45 vitest 5, #36 setup-node v7, #38/#39 checkout, #2 (superseded by Node 24; close); (3) Ryan plays an aside show on real YouTube, and the five manual checks (item 3 below); next stance review 2026-11-30. See [journal](journal/2026-11-01-1-stack-merged-and-first-compliance-review.md).
+
 **2026-10-31 (7) — the player reducer** on branch `player-reducer` (stacked on #41): [ADR-0036](adr/0036-the-players-position-is-one-pure-reducer.md); `src/core/playback.ts` with property tests; 156 unit, 77 e2e. **Next:** merge #40 → #41 → this PR; then Ryan plays an aside show on real YouTube (e2e fakes it); stance review's proposals then all done, next look 2026-11-30. See [journal](journal/2026-10-31-7-player-reducer.md).
 
 **2026-10-31 (6) — pnpm 12** on branch `pnpm-12` (stacked on #40): [ADR-0035](adr/0035-move-to-pnpm-12.md) and the move to pnpm 12.17.0; lockfile gains only pnpm's own entries; every gate green locally (OSV v2.7.0 reads 309 packages). **Next:** merge #40 then this PR (#41). See [journal](journal/2026-10-31-6-pnpm-12.md).
