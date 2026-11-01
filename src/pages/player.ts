@@ -5,6 +5,8 @@
 import { normalizeConfig } from "../core/config.ts";
 import type { EndScreen, ShowConfig, ShowNode } from "../core/config.ts";
 import { menuSections } from "../core/menu.ts";
+import { cueDue, endIsReal, initialPlayback, pastEnd, reducePlayback } from "../core/playback.ts";
+import type { PlaybackAction } from "../core/playback.ts";
 import { segmentEndAction } from "../core/routing.ts";
 import { escapeHtml } from "../core/text.ts";
 import { getTransfer } from "../shell/drafts.ts";
@@ -20,21 +22,14 @@ const CONFIG_URL =
   cfgParam && !/^[a-z]+:/i.test(cfgParam) && !cfgParam.startsWith("//") ? cfgParam : "config.json";
 const POLL_INTERVAL_MS = 250;
 const COUNTDOWN_TICK_MS = 50;
-const END_BACKSTOP_TOLERANCE = 0.25; // seconds past `end` before backstop fires
 
 let config: ShowConfig | null = null;
 const nodeMap = new Map<string, ShowNode>();
 let ytPlayer: YTPlayer | null = null;
-let currentNode: ShowNode | null = null;
+// Where the viewer is (ADR-0036): changed only through dispatch. The timers below are effects.
+let playback = initialPlayback;
 let choiceTimer: ReturnType<typeof setInterval> | null = null; // countdown (advances only while playing/ended)
 let pollHandle: ReturnType<typeof setInterval> | null = null; // mid-segment time cues
-let segmentChoicesShown = false; // true once choices are visible for the current segment
-// True once the current segment has reached PLAYING — guards against spurious ENDED events
-// that YouTube fires during loadVideoById transitions.
-let segmentReady = false;
-// Captured when entering an aside that opts into resume-at-branch-point via
-// returnAtCurrentTime; consumed on return.
-let branchContext: { nodeId: string; currentTime: number } | null = null;
 
 // ── DOM refs ──────────────────────────────────
 const $showTitle = byId("show-title");
@@ -55,6 +50,14 @@ const $menuToggle = byId("menu-toggle");
 const $menuClose = byId("menu-close");
 const $menuList = byId("menu-list");
 const $menuIndexLink = byId("menu-index-link");
+
+function dispatch(action: PlaybackAction): void {
+  if (config) playback = reducePlayback(config, playback, action);
+}
+
+function currentNode(): ShowNode | undefined {
+  return playback.nodeId === null ? undefined : nodeMap.get(playback.nodeId);
+}
 
 function currentTime(): number | null {
   return ytPlayer?.getCurrentTime ? ytPlayer.getCurrentTime() : null;
@@ -131,19 +134,13 @@ function onPlayerReady(): void {
 
 function onPlayerStateChange(e: { data: number }): void {
   if (e.data === YT_STATE.PLAYING) {
-    segmentReady = true;
+    dispatch({ type: "playing" });
     startPolling();
   } else if (e.data === YT_STATE.ENDED) {
     stopPolling();
-    // Guard 1: ignore ENDED before the new segment has actually started playing.
-    if (!segmentReady) return;
-    // Guard 2: when `end` is set, only treat ENDED as real if currentTime is near it.
-    // seekTo() from an ENDED state can re-fire ENDED before transitioning to PLAYING,
-    // which would otherwise trigger showChoices for the wrong moment.
-    const t = currentTime();
-    if (currentNode && typeof currentNode.end === "number" && t !== null) {
-      if (Math.abs(t - currentNode.end) > 5) return; // spurious — wait for the real end
-    }
+    // YouTube fires spurious ENDEDs during loadVideoById, and seekTo() from ENDED can re-fire one
+    // at the old time; wait for the real end.
+    if (!endIsReal(playback, currentNode(), currentTime())) return;
     onSegmentEnded();
   }
   // Other states (PAUSED, BUFFERING, CUED): leave polling alone; pollTick is a no-op when paused.
@@ -161,21 +158,15 @@ function stopPolling(): void {
 
 function pollTick(): void {
   const t = currentTime();
-  if (!currentNode || t === null) return;
+  const node = currentNode();
+  if (!node || t === null) return;
 
   // Mid-segment choice cue
-  if (
-    !segmentChoicesShown &&
-    typeof currentNode.showChoicesAt === "number" &&
-    t >= currentNode.showChoicesAt
-  ) {
-    segmentChoicesShown = true;
-    showChoices(currentNode);
-  }
+  if (cueDue(playback, node, t)) showChoices(node);
 
   // Backstop end detection — YouTube usually fires ENDED at endSeconds, but on slow loads /
   // certain browsers it can miss. Trigger ourselves if we've sailed past `end` without it.
-  if (typeof currentNode.end === "number" && t >= currentNode.end + END_BACKSTOP_TOLERANCE) {
+  if (pastEnd(node, t)) {
     stopPolling();
     onSegmentEnded();
   }
@@ -193,29 +184,32 @@ function onPlayerError(e: { data: number }): void {
 
 // ── Navigation ────────────────────────────────
 
-function navigateTo(nodeId: string, seekToOverride?: number): void {
+function navigateTo(nodeId: string): void {
+  // The clock as this segment is left: the branch point, if the target is an aside that takes one.
+  enter({ type: "navigate", nodeId, at: currentTime() });
+}
+
+/** Back to the branch point a `returnAtCurrentTime` aside was entered from. */
+function resumeBranch(): void {
+  if (playback.branch) enter({ type: "resume" });
+}
+
+function enter(action: PlaybackAction): void {
   if (!config || !ytPlayer) return;
   clearChoices();
   hideEndScreen();
   stopPolling();
-  segmentReady = false;
+  dispatch(action);
 
-  const node = nodeMap.get(nodeId);
+  const node = action.type === "navigate" ? nodeMap.get(action.nodeId) : currentNode();
   if (!node) {
-    showStatus(
-      `⚠️ Node not found: <code>${escapeHtml(nodeId)}</code><br><small>Check your config.json for a matching id.</small>`
-    );
+    if (action.type === "navigate") {
+      showStatus(
+        `⚠️ Node not found: <code>${escapeHtml(action.nodeId)}</code><br><small>Check your config.json for a matching id.</small>`
+      );
+    }
     return;
   }
-
-  // Capture where the viewer is branching from, but only when leaving the main line
-  // (i.e. not from an aside — otherwise nested asides would clobber the original anchor).
-  const t = currentTime();
-  if (node.returnAtCurrentTime && currentNode && !currentNode.isAside && t !== null) {
-    branchContext = { nodeId: currentNode.id, currentTime: t };
-  }
-
-  currentNode = node;
 
   // Update URL hash (enables back/forward and deep linking)
   history.pushState(null, "", `#${node.id}`);
@@ -246,14 +240,10 @@ function navigateTo(nodeId: string, seekToOverride?: number): void {
   }
 
   // Back-to-branch-point button: only meaningful when both opted in and an anchor was captured.
-  if (node.returnAtCurrentTime && branchContext) {
-    const ctx = branchContext;
+  if (node.returnAtCurrentTime && playback.branch) {
     $backBtn.textContent = "← Back to where I was";
     $backBtn.classList.add("visible");
-    $backBtn.onclick = () => {
-      branchContext = null;
-      navigateTo(ctx.nodeId, ctx.currentTime);
-    };
+    $backBtn.onclick = resumeBranch;
   } else {
     $backBtn.classList.remove("visible");
     $backBtn.onclick = null;
@@ -267,17 +257,8 @@ function navigateTo(nodeId: string, seekToOverride?: number): void {
     return;
   }
 
-  // Effective start: explicit override (back-button resume) > node.start > 0.
-  const startSec =
-    typeof seekToOverride === "number"
-      ? seekToOverride
-      : typeof node.start === "number"
-        ? node.start
-        : 0;
-
-  // If we're resuming past the mid-segment cue, don't re-fire choices on the way back in.
-  // The end-of-segment flow will still show them when the segment finishes naturally.
-  segmentChoicesShown = typeof node.showChoicesAt === "number" && startSec >= node.showChoicesAt;
+  // node.start, or the branch point on resume.
+  const startSec = playback.startAt;
 
   // If we're already on this videoId, just seek instead of reloading. Avoids the black-screen
   // reload flash when slicing one master video into many segments. pollTick's backstop handles
@@ -286,16 +267,16 @@ function navigateTo(nodeId: string, seekToOverride?: number): void {
   const sameVideo = currentData?.video_id === videoId;
 
   if (sameVideo) {
-    // Only pre-arm segmentReady if the player is already PLAYING — otherwise we'd race
+    // Only pre-arm readiness if the player is already PLAYING — otherwise we'd race
     // against a spurious ENDED that can fire when seekTo() is called from ENDED state.
     const stateBefore = playerState() ?? -1;
     ytPlayer.seekTo?.(startSec, true);
     ytPlayer.playVideo?.();
     if (stateBefore === YT_STATE.PLAYING) {
-      segmentReady = true;
+      dispatch({ type: "playing" });
       startPolling();
     }
-    // Otherwise: wait for the real PLAYING state event to flip segmentReady + start polling.
+    // Otherwise: wait for the real PLAYING state event to make it ready + start polling.
   } else {
     ytPlayer.loadVideoById?.({
       videoId,
@@ -310,21 +291,17 @@ function navigateTo(nodeId: string, seekToOverride?: number): void {
 }
 
 function onSegmentEnded(): void {
-  const node = currentNode;
+  const node = currentNode();
   if (!node || !config) return;
 
   // If mid-segment choices are already visible, the countdown owns the next step.
-  if ($choices.classList.contains("visible")) return;
+  if (playback.choicesVisible) return;
 
-  const action = segmentEndAction(config, node, branchContext !== null);
+  const action = segmentEndAction(config, node, playback.branch !== null);
   switch (action.kind) {
-    case "resume-branch": {
-      // Resume at the original branch point this aside opted into.
-      const ctx = branchContext;
-      branchContext = null;
-      if (ctx) navigateTo(ctx.nodeId, ctx.currentTime);
+    case "resume-branch": // Resume at the original branch point this aside opted into.
+      resumeBranch();
       return;
-    }
     case "auto-advance": // One default choice: a clean cut, no button or countdown (ADR-0031)
     case "return-to": // Aside with returnTo: auto-route back to the main line
     case "continue": // No way forward: play on into the next node (ADR-0022)
@@ -346,6 +323,7 @@ function onSegmentEnded(): void {
 
 function showChoices(node: ShowNode): void {
   clearChoices();
+  dispatch({ type: "show-choices" });
 
   // Mid-segment: countdown runs until `end` is reached.
   // End-of-segment: fall back to configured choiceDisplaySeconds.
@@ -365,7 +343,6 @@ function showChoices(node: ShowNode): void {
     btn.className = `choice-btn ${choice.style === "secondary" ? "secondary" : "primary"}`;
     btn.textContent = choice.label;
     btn.onclick = () => {
-      clearChoices();
       // Analytics hook:
       // gtag('event', 'choice_click', { from: node.id, to: choice.target, label: choice.label });
       navigateTo(choice.target);
@@ -378,7 +355,6 @@ function showChoices(node: ShowNode): void {
   if (defaultChoice && displaySeconds > 0) {
     $cdWrap.style.display = "block";
     startCountdown(displaySeconds, () => {
-      clearChoices();
       navigateTo(defaultChoice.target);
     });
   } else {
@@ -417,6 +393,7 @@ function startCountdown(durationSec: number, onComplete: () => void): void {
   }, COUNTDOWN_TICK_MS);
 }
 
+/** The choice UI only; `playback.choicesVisible` clears when the segment is left. */
 function clearChoices(): void {
   if (choiceTimer !== null) clearInterval(choiceTimer);
   choiceTimer = null;
@@ -512,7 +489,7 @@ function buildMenuList(): void {
 
 function appendMenuItem(node: ShowNode): void {
   const item = document.createElement("button");
-  item.className = "menu-item" + (currentNode?.id === node.id ? " current" : "");
+  item.className = "menu-item" + (playback.nodeId === node.id ? " current" : "");
 
   const title = document.createElement("span");
   title.className = "menu-item-title";
@@ -546,7 +523,7 @@ document.addEventListener("keydown", (e) => {
 
 window.addEventListener("popstate", () => {
   const hash = location.hash.replace("#", "").trim();
-  if (hash && nodeMap.has(hash) && hash !== currentNode?.id) {
+  if (hash && nodeMap.has(hash) && hash !== playback.nodeId) {
     navigateTo(hash);
   }
 });
