@@ -119,6 +119,7 @@ Copy [`TEMPLATE.md`](TEMPLATE.md).
 | [0033](0033-accessibility-checks-with-axe.md) | Accessibility is checked with axe against every page in CI | Accepted |
 | [0034](0034-editor-and-studio-edit-a-working-copy-diffed-into-events.md) | The Editor and Studio edit a working copy that is diffed into events | Accepted |
 | [0035](0035-move-to-pnpm-12.md) | Move to pnpm 12, with the lockfile regenerated in its own change | Accepted |
+| [0036](0036-the-players-position-is-one-pure-reducer.md) | The player's position is one pure reducer | Accepted |
 | [1000](1000-template-standards-adrs-are-inherited.md) | Template standards ADRs are inherited, numbered 1000 and up | Accepted |
 | [1001](1001-project-conventions-is-the-canonical-standard.md) | project-conventions is the canonical provable-code standard | Accepted |
 | [1002](1002-provable-is-a-four-rung-ladder.md) | "Provable" means a four-rung ladder, and a project claims only the rungs CI enforces | Accepted |
