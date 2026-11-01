@@ -142,4 +142,6 @@ Copy [`TEMPLATE.md`](TEMPLATE.md).
 | [1017](1017-state-is-managed-facts-managed-position-derived-values.md) | State is managed facts, managed position and derived values, and a screen's transitions go through one pure, property-tested reducer | Accepted |
 | [1018](1018-osv-scanner-reads-the-whole-lockfile.md) | OSV-Scanner is at least v2.7.0, and a scan is read by its package count, not just its verdict | Accepted |
 | [1019](1019-http-apis-lint-against-a-vendored-api-standards-ruleset.md) | HTTP APIs are linted in CI against a vendored, pinned api-standards ruleset | Accepted |
-| [1020](1020-ci-runs-the-active-lts-and-the-engines-floor-trails-it.md) | CI runs the Active LTS (Node 26); the engines floor stays one LTS behind (24) | Accepted |
+| [1020](1020-ci-runs-the-active-lts-and-the-engines-floor-trails-it.md) | CI runs the Active LTS (Node 26); the engines floor stays one LTS behind (24) | Superseded by [ADR-1022](1022-ci-the-engines-floor-and-types-node-share-the-active-lts.md) |
+| [1021](1021-projects-start-with-a-renovate-config.md) | Projects start with a Renovate config that encodes the standards it could break | Accepted |
+| [1022](1022-ci-the-engines-floor-and-types-node-share-the-active-lts.md) | CI, the engines floor and `@types/node` all follow the Active LTS (Node 26) | Accepted |

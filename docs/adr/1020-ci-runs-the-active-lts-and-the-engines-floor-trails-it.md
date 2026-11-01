@@ -1,5 +1,5 @@
 # ADR-1020: CI runs the Active LTS (Node 26); the engines floor stays one LTS behind (24)
-- Status: Accepted
+- Status: Superseded by [ADR-1022](1022-ci-the-engines-floor-and-types-node-share-the-active-lts.md)
 - Date: 2026-11-01
 - Deciders: Ryan
 - Supersedes: [ADR-1013](1013-node-24-lts-in-ci.md)
