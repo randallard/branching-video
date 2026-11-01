@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import type { ShowConfig } from "./config.ts";
-import { diffShow, emptyShowState, workingFromState } from "./diff.ts";
+import { diffShow, emptyShowState, isBlankShow, workingFromState } from "./diff.ts";
 import type { WorkingShow } from "./diff.ts";
 import type { ShowEvent } from "./events.ts";
 import { findShow, reduce, toConfig } from "./reduce.ts";
@@ -31,8 +31,10 @@ function save(events: readonly ShowEvent[], config: ShowConfig, at: string, tag 
 describe("diffShow", () => {
   it("round-trips any config through a diff", () => {
     // The property the pages depend on: save what's on screen, reduce, get it back.
+    // A blank config records nothing by design (ADR-0038), so it's the one exception.
     fc.assert(
       fc.property(arbitraryConfig, (config) => {
+        fc.pre(!isBlankShow(config));
         const events = save([], config, "2026-09-15T00:00:00.000Z");
         const show = findShow(reduce(events), SHOW);
         expect(show).toBeDefined();
@@ -44,9 +46,27 @@ describe("diffShow", () => {
   it("round-trips an edit applied on top of an existing show", () => {
     fc.assert(
       fc.property(arbitraryConfig, arbitraryConfig, (first, second) => {
+        // Two blank saves record nothing, so there's no show to read back (ADR-0038).
+        fc.pre(!(isBlankShow(first) && isBlankShow(second)));
         const afterFirst = save([], first, "2026-09-15T00:00:00.000Z", "a");
         const afterSecond = save(afterFirst, second, "2026-09-16T00:00:00.000Z", "b");
         expect(toConfig(findShow(reduce(afterSecond), SHOW)!)).toEqual(second);
+      })
+    );
+  });
+
+  it("saves nothing for a blank config, so the show never exists (ADR-0038)", () => {
+    const blank: ShowConfig = { title: "", startNode: "", nodes: [] };
+    expect(isBlankShow(blank)).toBe(true);
+    const events = save([], blank, "2026-09-15T00:00:00.000Z");
+    expect(events).toHaveLength(0);
+    expect(findShow(reduce(events), SHOW)).toBeUndefined();
+  });
+
+  it("a config is blank exactly when it diffs to nothing against an empty show", () => {
+    fc.assert(
+      fc.property(arbitraryConfig, (config) => {
+        expect(isBlankShow(config)).toBe(save([], config, "2026-09-15T00:00:00.000Z").length === 0);
       })
     );
   });

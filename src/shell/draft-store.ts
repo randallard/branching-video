@@ -10,7 +10,7 @@
  * page asks Studio to open — not drafts, and nothing about them needs to merge or survive.
  */
 import type { ShowConfig } from "../core/config.ts";
-import { diffShow, emptyShowState, workingFromState } from "../core/diff.ts";
+import { diffShow, emptyShowState, isBlankShow, workingFromState } from "../core/diff.ts";
 import type { WorkingShow } from "../core/diff.ts";
 import type { ShowEvent } from "../core/events.ts";
 import { buildHistories, historyKey, priorValues } from "../core/history.ts";
@@ -168,8 +168,10 @@ export class DraftStore {
     );
   }
 
-  /** A brand-new show. Returns its generated id (ADR-0009). */
+  /** A brand-new show. Returns its generated id (ADR-0009). Refuses a blank config, which would
+   * record nothing and hand back the id of a show that isn't in the log (ADR-0038). */
   async create(config: ShowConfig): Promise<string> {
+    if (isBlankShow(config)) throw new Error("a blank show has nothing to save (ADR-0038)");
     const showId = newId();
     await this.save({ showId, config, nodeKeys: config.nodes.map(() => null) });
     return showId;

@@ -75,6 +75,16 @@ function same(a: unknown, b: unknown): boolean {
   return a === b || canonicalJson(a) === canonicalJson(b);
 }
 
+/** A config that diffs to nothing against a show the log has never seen, so saving it records
+ * nothing and the show never exists (ADR-0038). */
+export function isBlankShow(config: ShowConfig): boolean {
+  const empty = emptyShowState("");
+  return (
+    config.nodes.length === 0 &&
+    SHOW_FIELDS.every((field) => same(stateShowValue(empty, field), showValue(config, field)))
+  );
+}
+
 /** An absent value has to travel as `null`: `undefined` does not survive JSON, and the reducer
  * reads "not a usable value" as "clear this field". */
 function payload(value: unknown): unknown {
