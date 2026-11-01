@@ -87,10 +87,10 @@ requires **a dedicated ADR** explaining why, and the crate-root change is the vi
   `proptest`. Not using Kani? Record that in a project ADR and delete the job.
 - **provable+**: Verus, a deductive verifier, proves `requires`/`ensures`/invariants for
   *all* inputs, with no bound. Adopt it only by a project ADR that **names the invariant**
-  (eligibility, sealing, a permission boundary: something whose violation is a legal or safety
-  harm). LLMs may write the proofs, but **a human reviews the spec line by line**, because a proof
-  only shows the code meets the spec as written. Verus runs through its own driver, so it gets its
-  own CI job ([ADR-1003](../../../docs/adr/1003-provable-plus-tier-verus-for-named-invariants.md)).
+  (eligibility, record confidentiality, a permission boundary: something whose violation is a
+  legal or safety harm). LLMs may write the proofs, but **a human reviews the spec line by line**,
+  because a proof only shows the code meets the spec as written. Verus runs through its own
+  driver, so it gets its own CI job ([ADR-1003](../../../docs/adr/1003-provable-plus-tier-verus-for-named-invariants.md)).
   Other deductive tools (Creusot, Prusti) need the same justification.
 - **Miri**, if you add it, runs in a job with no secrets and no shared `target/` cache
   ([ADR-1009](../../../docs/adr/1009-miri-runs-without-secrets-or-shared-target-cache.md)).
@@ -258,6 +258,27 @@ Two honest caveats:
   and only the location was wrong.
 - An ignore records **why no patched version is usable**, never a quarantine wait or a
   severity opinion, and names the condition that retires it.
+
+## HTTP APIs
+
+For a project that exposes or consumes an HTTP API
+([ADR-1019](../../../docs/adr/1019-http-apis-lint-against-a-vendored-api-standards-ruleset.md)):
+
+- **The contract comes first.** Write `openapi.yaml` (or `openapi/*.yaml`) in OpenAPI 3.1.2
+  before the handler, and change it in the same commit as the code that implements the change.
+- **It follows [api-standards](https://github.com/randallard/api-standards)**, vendored at a
+  pinned tag: `scripts/vendor-api-standards.sh <tag>` writes `.spectral/api-standards.yaml`, its
+  lock, and a starter `.spectral.yaml`. CI's `api-lint` job detects the document, checks the copy
+  against the lock, and lints with `--fail-severity=warn`. Locally, with Spectral 6.17.0:
+  `spectral lint --fail-severity=warn --ruleset .spectral.yaml openapi.yaml`.
+- **A departure is an `overrides` entry** in `.spectral.yaml`, scoped to the paths or schemas
+  it covers, with its reason in a comment. Never turn a rule off for the whole document.
+- **A third-party specification** kept for reference lives outside `openapi.yaml` and
+  `openapi/*.yaml` (for example in `openapi/vendor/`), so it isn't held to our standard.
+- **Three questions the linter can't answer**, for every review that touches the contract: Is
+  every query scoped to the caller's tenant? Can a restricted record, or the fact that it
+  exists, leak through a list, a count, an error or a search? Does every operation name the
+  role or scope it needs, and does the server actually check it?
 
 ## Docs that must stay current
 

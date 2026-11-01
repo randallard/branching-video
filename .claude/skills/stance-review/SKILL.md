@@ -57,6 +57,12 @@ Work `docs/reviews/README.md`'s checklist. Concretely:
 7. **Last review's deferrals**: did the thing they were waiting on land?
 8. **Package-manager majors**: is a new pnpm or Cargo major out? Evaluate it here before
    `packageManager` or the toolchain moves (ADR-1016).
+9. **HTTP API standard** (only if `.spectral/api-standards.lock` exists, ADR-1019): is its tag
+   the latest `api-standards` release
+   (`gh release list -R randallard/api-standards -L 1`, or `git ls-remote --tags`)? Is the
+   Spectral pin in `ci.yml` the latest release? Does every `overrides` entry in `.spectral.yaml`
+   still have a live reason? A bump is a deliberate re-run of `scripts/vendor-api-standards.sh`
+   with the diff reviewed, not an automatic one.
 
 ## Recording it
 
