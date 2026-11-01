@@ -4,7 +4,9 @@ _Last updated: 2026-10-31_
 
 ## Status / next
 
-**2026-10-31 (6) — pnpm 12** on branch `pnpm-12` (stacked on #40): [ADR-0035](adr/0035-move-to-pnpm-12.md) and the move to pnpm 12.17.0; lockfile gains only pnpm's own entries; every gate green locally (OSV v2.7.0 reads 309 packages). **Next:** merge #40 then this PR; then the player reducer (ADR, then change). See [journal](journal/2026-10-31-6-pnpm-12.md).
+**2026-10-31 (7) — the player reducer** on branch `player-reducer` (stacked on #41): [ADR-0036](adr/0036-the-players-position-is-one-pure-reducer.md); `src/core/playback.ts` with property tests; 156 unit, 77 e2e. **Next:** merge #40 → #41 → this PR; then Ryan plays an aside show on real YouTube (e2e fakes it); stance review's proposals then all done, next look 2026-11-30. See [journal](journal/2026-10-31-7-player-reducer.md).
+
+**2026-10-31 (6) — pnpm 12** on branch `pnpm-12` (stacked on #40): [ADR-0035](adr/0035-move-to-pnpm-12.md) and the move to pnpm 12.17.0; lockfile gains only pnpm's own entries; every gate green locally (OSV v2.7.0 reads 309 packages). **Next:** merge #40 then this PR (#41). See [journal](journal/2026-10-31-6-pnpm-12.md).
 
 **2026-10-31 (5) — the working copy, recorded** on branch `adr-working-copy` (PR #40): [ADR-0034](adr/0034-editor-and-studio-edit-a-working-copy-diffed-into-events.md) records that the Editor and Studio edit a `WorkingShow` diffed into per-field events, the project's deviation from ADR-1017. **Next:** commit and PR it; then pnpm 12 (ADR first; mind ADR-1018); then the player reducer (ADR, then change). See [journal](journal/2026-10-31-5-working-copy-adr.md).
 
