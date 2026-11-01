@@ -139,3 +139,4 @@ Copy [`TEMPLATE.md`](TEMPLATE.md).
 | [1016](1016-pnpm-supply-chain-settings-stay-explicit.md) | pnpm supply-chain settings stay explicit, and major pnpm bumps are evaluated first | Accepted |
 | [1017](1017-state-is-managed-facts-managed-position-derived-values.md) | State is managed facts, managed position and derived values, and a screen's transitions go through one pure, property-tested reducer | Accepted |
 | [1018](1018-osv-scanner-reads-the-whole-lockfile.md) | OSV-Scanner is at least v2.7.0, and a scan is read by its package count, not just its verdict | Accepted |
+| [1019](1019-http-apis-lint-against-a-vendored-api-standards-ruleset.md) | HTTP APIs are linted in CI against a vendored, pinned api-standards ruleset | Accepted |
