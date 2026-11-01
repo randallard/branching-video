@@ -16,6 +16,11 @@
       "description": "ADR-1010: TypeScript stays on 6.0.x until the type-aware lint gate supports 7 (typescript-eslint 8.72.1 still declares typescript <6.1.0, checked 2026-11-01). Lift this rule when either of ADR-1010's exit triggers is met.",
       "matchPackageNames": ["typescript"],
       "allowedVersions": "6.0.x"
+    },
+    {
+      "description": "ADR-0037: @types/node describes the engines floor (Node 24), not CI's Node 26, so a tool can't use a 26-only API by accident. Move with the floor.",
+      "matchPackageNames": ["@types/node"],
+      "allowedVersions": "24.x"
     }
   ]
 }
