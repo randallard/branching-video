@@ -218,7 +218,7 @@ jobs:
     # the version in the trailing comment. Bump deliberately.
     # No timeout-minutes here (ADR-1005's one exception): GitHub rejects it on a job that calls a
     # reusable workflow; the called workflow's own jobs carry their limits.
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
 
   # Runs on every project, with or without a manifest: a secret can be committed to any repo.
   # Not a marketplace action: gitleaks-action needs a paid license on organisation accounts, and
