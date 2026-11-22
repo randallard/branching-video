@@ -27,6 +27,17 @@
       "matchManagers": ["github-actions"],
       "matchDepNames": ["node"],
       "rangeStrategy": "replace"
+    },
+    {
+      "description": "ADR-1023: routine updates merge themselves once every check passes and the age gate clears. Majors, and minors of 0.x packages, stay manual. Only enable this where main requires the CI checks; with no required checks, Renovate can merge before CI has run.",
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchCurrentVersion": "!/^v?0\\./",
+      "automerge": true
+    },
+    {
+      "description": "ADR-1023: digest, pin and lockfile-maintenance updates change no version range, so they merge themselves on the same terms.",
+      "matchUpdateTypes": ["digest", "pin", "pinDigest", "lockFileMaintenance"],
+      "automerge": true
     }
   ]
 }
