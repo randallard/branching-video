@@ -1,10 +1,14 @@
 # Progress & Status
 
-_Last updated: 2026-11-01_
+_Last updated: 2026-11-21_
 
 ## Status / next
 
 **Standards:** last compliance review 2026-11-01: compliant on the #40/#41/#44 stack tip apart from currency, 3 gaps (ADR-1019 and its skill text not inherited; no `.env.example`; Renovate #43 proposes TypeScript 7 against ADR-1010), all 3 fixed on `compliance-2026-11-01` ([note](compliance/2026-11-01.md))
+
+**2026-11-21 (2): ADR-1023 from the template, routine Renovate updates merge themselves** ([journal](journal/2026-11-21-2-adr-1023-renovate-automerge.md)). Minor and patch updates of 1.0+ packages, plus digest, pin and lockfile updates, merge once CI passes. Majors and 0.x minors stay manual. The precondition holds (7 required checks); watch whether the up-to-date queue clears itself. **Next:** confirm the first automerge (the lockfile PR, after its age gate clears); the remaining items are in the line below.
+
+**2026-11-21 — Renovate backlog cleared** ([journal](journal/2026-11-21-1-renovate-backlog-cleared.md)). 9 PRs merged; `main` green. #58's red CI was a withdrawn picomatch advisory. **Next:** merge #53 (lockfile) once the age gate clears; decide the stray `changes-for-playthrough-unverified` branch; user guide + glossary; the cello epic (loop a chosen section) once Ryan confirms the stories; Ryan's real-YouTube aside check and five manual checks; stance review 2026-11-30.
 
 **2026-11-01 (6): ADR-1022 from the template, Node 26 as the floor** ([journal](journal/2026-11-01-6-adr-1022-node-26-floor.md)). `engines` `>=26.0.0`, `@types/node` 26.6.6. Local gates pass. Merged as #51 (`992face`), CI green on `main` with e2e passing.
 

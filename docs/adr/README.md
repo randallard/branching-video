@@ -145,3 +145,4 @@ Copy [`TEMPLATE.md`](TEMPLATE.md).
 | [1020](1020-ci-runs-the-active-lts-and-the-engines-floor-trails-it.md) | CI runs the Active LTS (Node 26); the engines floor stays one LTS behind (24) | Superseded by [ADR-1022](1022-ci-the-engines-floor-and-types-node-share-the-active-lts.md) |
 | [1021](1021-projects-start-with-a-renovate-config.md) | Projects start with a Renovate config that encodes the standards it could break | Accepted |
 | [1022](1022-ci-the-engines-floor-and-types-node-share-the-active-lts.md) | CI, the engines floor and `@types/node` all follow the Active LTS (Node 26) | Accepted |
+| [1023](1023-routine-renovate-updates-merge-themselves.md) | Routine Renovate updates merge themselves once CI passes; majors stay manual | Accepted |
