@@ -6,6 +6,8 @@ _Last updated: 2026-11-22_
 
 **Standards:** last compliance review 2026-11-01: compliant on the #40/#41/#44 stack tip apart from currency, 3 gaps (ADR-1019 and its skill text not inherited; no `.env.example`; Renovate #43 proposes TypeScript 7 against ADR-1010), all 3 fixed on `compliance-2026-11-01` ([note](compliance/2026-11-01.md))
 
+**2026-11-22 (2): story C1, loop one step of a show,** is proposed in cycle-in's `docs/stories.md` (the cello epic): `player.html?config=…&loop=1#<nodeId>` replays that step's segment until it's turned off, with a property test that loop mode never changes the current step. Accepted 2026-11-22; cycle-in's C3 comes first, and C1 can run in parallel.
+
 **2026-11-22 (1): ADR-1024 from the template** ([journal](journal/2026-11-22-1-adr-1024-explicit-deny-toml.md)): an explicit `deny.toml` with `unmaintained = "all"`. The ADR is copied. No `deny.toml` here, because there's no Rust and no cargo-deny job. **Next:** as in the line below.
 
 **2026-11-21 (2): ADR-1023 from the template, routine Renovate updates merge themselves** ([journal](journal/2026-11-21-2-adr-1023-renovate-automerge.md)). Minor and patch updates of 1.0+ packages, plus digest, pin and lockfile updates, merge once CI passes. Majors and 0.x minors stay manual. The precondition holds (7 required checks); watch whether the up-to-date queue clears itself. **Next:** confirm the first automerge (the lockfile PR, after its age gate clears); the remaining items are in the line below.
